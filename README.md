@@ -17,9 +17,15 @@ The current prototype contains:
 
 ## Contribute and request improvements
 
+Missing device support or a workflow capability? Use the request and contribution-guide links beneath the Devices or Workflows list. The device picker and workflow toolkit also include compact request links. Requests open the matching public GitHub form; general questions can use private Quick feedback.
+
 Both internal and external code contributions target `dev`. Maintainers squash-merge Conventional PR titles, promote `dev` to `main` with a merge commit, then approve the release-please version/release-notes PR. Production tags retain the signed build and manifest pipeline. See [the release guide](docs/guides/releases.md) for activation, release approval and synchronization back to `dev`.
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) for public requests, development and review, including the current pending contribution terms. Browse [community requests](https://github.com/edge-studio-technology/edge-studio/issues), use the [request chooser](https://github.com/edge-studio-technology/edge-studio/issues/new/choose), or start with the [contributor quickstart](docs/guides/contributor-quickstart.md) and [optional AI skill](docs/guides/contributor-ai.md). In-app feedback remains a separate private route. GitHub forms and the public contribution links become available from the default branch when this work reaches `main`.
+Read [CONTRIBUTING.md](CONTRIBUTING.md) for public requests, development and review, including the MIT contribution terms. Browse [community requests](https://github.com/edge-studio-technology/edge-studio/issues), use the [request chooser](https://github.com/edge-studio-technology/edge-studio/issues/new/choose), or start with the [contributor quickstart](docs/guides/contributor-quickstart.md) and [optional AI skill](docs/guides/contributor-ai.md). In the app, **Help & feedback** offers direct GitHub forms for bugs, devices, workflows and improvements, plus private vulnerability reporting. **Send quick feedback** opens the existing private form for general questions or informal feedback without a GitHub account; its Integritas configuration and per-submission consent requirements still apply. Back returns to the chooser without losing an unfinished draft. Private feedback metadata/configuration loads only after opening that form; no draft or device details are copied to GitHub.
+
+## License
+
+Edge Studio code and documentation are available under the [MIT License](LICENSE). Third-party dependencies and separately licensed material retain their own licenses and notices.
 
 ## Installation On Raspberry Pi
 
