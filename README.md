@@ -15,6 +15,8 @@ The current prototype contains:
 - Read-only file browsing for a configured host directory
 - A simple architecture that can grow with more services later
 
+See [supported hardware, devices and workflow blocks](docs/guides/supported-capabilities.md) for the capability catalog, prerequisites, setup guides and recorded verification evidence.
+
 ## Contribute and request improvements
 
 Missing device support or a workflow capability? Use the request and contribution-guide links beneath the Devices or Workflows list. The device picker and workflow toolkit also include compact request links. Requests open the matching public GitHub form; general questions can use private Quick feedback.
