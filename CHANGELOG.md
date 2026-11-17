@@ -4,6 +4,13 @@ All notable changes to `edge-studio` are documented in this file.
 
 New releases are prepared by release-please from Conventional commit subjects; see [the release guide](docs/guides/releases.md). Earlier entries retain their original Keep a Changelog format.
 
+## [0.45.0](https://github.com/edge-studio-technology/edge-studio/compare/v0.44.0...v0.45.0) (2026-11-17)
+
+
+### Features
+
+* **feedback:** improve community support routes and adopt MIT licensing ([#180](https://github.com/edge-studio-technology/edge-studio/issues/180)) ([e7376a8](https://github.com/edge-studio-technology/edge-studio/commit/e7376a8e8f05e5055a9338cf7667a3b1f346294a))
+
 ## [0.44.0](https://github.com/edge-studio-technology/edge-studio/compare/v0.43.0...v0.44.0) (2026-11-06)
 
 
