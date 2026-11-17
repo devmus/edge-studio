@@ -4,6 +4,9 @@ Scratch log for the session in progress. Update it as you go; reset it when a se
 
 ## Progress
 
+- 2026-11-17 support catalog: added one public overview of four hardware/service capabilities, fourteen device/integration templates and fifteen workflow block types. Linked it from README, CONTRIBUTING and the docs index; contribution instructions require keeping it current. Used current code/UI names and linked the GPIO guide's documented prototype tests separately from generic protocol support and physical evidence not recorded here. No hardware test or runtime change was performed.
+- Verification: all fourteen template and fifteen block names match source inventory; catalog local file/section links resolve; documentation lint and whitespace checks passed. Runtime tests were not rerun for this documentation-only change.
+
 - 2026-11-17 contributor prompt: added a copyable device-integration starting prompt under CONTRIBUTING's development section and linked the AI guide to that single example. Covered instruction discovery, existing integration reuse, complete implementation, actual verification and authorized fork/PR handoff into dev. Independent contributor/hardware validation remains open; no runtime changes.
 - Verification: documentation lint and whitespace checks passed. Runtime tests were not rerun for this documentation-only change.
 

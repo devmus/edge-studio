@@ -3,6 +3,8 @@
 `docs/` describes the codebase as it is now. Finished plans are deleted, not archived; git history
 keeps them.
 
+Start with the [supported hardware, devices and workflow blocks](./guides/supported-capabilities.md) catalog for current choices, requirements, setup links and verification evidence.
+
 ```
 docs/
 ├── PROJECT.md                  goal, audience, constraints, success criteria
@@ -132,6 +134,7 @@ Start a public source contribution at [CONTRIBUTING.md](../CONTRIBUTING.md). The
 
 | Doc | Purpose |
 | --- | ------- |
+| [guides/supported-capabilities.md](./guides/supported-capabilities.md) | Hardware, device and workflow block catalog with prerequisites and verification evidence |
 | [guides/gpio-device-settings.md](./guides/gpio-device-settings.md) | Tested and suggested GPIO input/output settings by device type |
 | [guides/contributor-quickstart.md](./guides/contributor-quickstart.md) | Fork, run and verify a modified local/Pi source build |
 | [guides/contributor-architecture.md](./guides/contributor-architecture.md) | Current components, ownership and integration boundaries |
