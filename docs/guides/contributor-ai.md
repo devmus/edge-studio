@@ -13,9 +13,7 @@ The public entry skill is [edge-studio-contributor](../../.agents/skills/edge-st
 
 No particular AI vendor, paid account, internal OpenProject connection, team Pi or `.env.local` credentials are needed. Tools differ in how they discover skills; this guide does not claim automatic discovery in every harness. Use your tool's own documentation for its installation directory and permissions.
 
-Example prompt:
-
-> Read the edge-studio-contributor skill and use my Edge Studio checkout at the path I provide. I want to add support for a device that sends JSON over MQTT. First check whether the existing MQTT device path is enough, identify a complete existing example, and propose the smallest change. Implement and test only the agreed scope. Do not publish, deploy or access hardware without my authorization.
+Use the [copyable starting prompt in CONTRIBUTING.md](../../CONTRIBUTING.md#start-with-an-ai-assistant). It covers the device request, matching repository instructions, implementation and verification, and preparation of a PR against upstream `dev`. Replace its bracketed values with your checkout path, exact device model, manufacturer documentation and desired behaviour. Publishing requires your authorization and GitHub authentication; when tools are unavailable, the assistant should provide the commands and PR text.
 
 The skill routes to human guides instead of maintaining another set of architecture rules. It asks for real test results and clear physical-test limitations. Inspect the diff, understand dependencies and error cases, and review generated code before submitting it. A tool saying “safe” or “all tests passed” is not evidence unless the relevant commands actually ran and produced that result.
 
