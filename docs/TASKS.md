@@ -76,6 +76,8 @@
 
 ## Done
 
+- [x] Added a copyable AI device-contribution prompt to CONTRIBUTING and linked it from the AI guide, including repository instructions, integration scope, evidence and fork-to-PR handoff. Independent contributor and physical-hardware trials remain open.
+
 - [x] Added the project-wide MIT license, matching package/lockfile metadata and explicit MIT contribution terms; reconciled active contribution guides and the plan. Documentation/whitespace checks and metadata-only comparison passed. Named ownership and independent acceptance trials remain open.
 
 - [x] Added secondary public request/contribution links below Devices and Workflows pagination, plus compact request links in device selection and the workflow toolkit. Verified 60 focused tests, all 1,840 frontend tests with coverage, lint/typecheck/build/docs and isolated desktop/mobile previews. See [verification](./reports/contextual-contribution-links-2026-11-16/README.md).

@@ -4,6 +4,9 @@ Scratch log for the session in progress. Update it as you go; reset it when a se
 
 ## Progress
 
+- 2026-11-17 contributor prompt: added a copyable device-integration starting prompt under CONTRIBUTING's development section and linked the AI guide to that single example. Covered instruction discovery, existing integration reuse, complete implementation, actual verification and authorized fork/PR handoff into dev. Independent contributor/hardware validation remains open; no runtime changes.
+- Verification: documentation lint and whitespace checks passed. Runtime tests were not rerun for this documentation-only change.
+
 - 2026-11-16 licensing: added the standard MIT license for Edge Studio code/docs, matching license metadata in all four package manifests and lockfile roots, explicit inbound MIT contribution terms and ADR 0043. Preserved third-party terms and historical reports; named maintainers and independent contribution/hardware trials remain open. No dependency, version or runtime changes.
 - Verification: documentation lint and whitespace checks passed; semantic comparison against HEAD confirmed all eight package/lockfile changes only add the project MIT license field. Reviewed the standard license text and copyright notice. Runtime tests were not rerun for this licensing/documentation change.
 

@@ -39,6 +39,39 @@ For a large change, new dependency, driver or architectural change, discuss the 
 
 Reviewers may request changes, ask for hardware evidence, defer or decline a change. Passing CI does not automatically approve it. Accepted changes are released through the normal `dev` → `main` process; a merge is not an immediate deployment. Installing a fork is an unofficial source build with its own maintenance/update obligations.
 
+### Start with an AI assistant
+
+After cloning your fork, open it in your AI coding tool and copy the prompt below. Replace the bracketed values with your device details and desired behaviour. See the [AI contribution guide](docs/guides/contributor-ai.md) for loading the skill when your tool does not discover it automatically.
+
+```text
+Use my Edge Studio checkout at [local checkout path]. Read AGENTS.md,
+CONTRIBUTING.md and .agents/skills/edge-studio-contributor/SKILL.md
+from this checkout before making changes.
+
+I want to add support for [exact device model], using [manufacturer
+documentation URL]. The expected behaviour is [what the user should
+be able to do].
+
+Check whether an existing protocol or integration can be reused. Identify
+a complete existing example and propose the smallest complete change.
+Ask about missing device details or unclear scope before implementing.
+
+Follow the contribution guides and relevant project rules. Work on a
+topic branch in my fork based on upstream dev. Implement the agreed
+scope across backend, device setup/editing, setup guides and workflows
+where needed. Update documentation and run the relevant checks.
+Report actual results, failed or unrun checks, and anything requiring
+physical hardware verification.
+
+Review the diff and prepare a Conventional PR title and description
+using the repository template, targeting upstream dev. Explain the
+commit, push-to-my-fork and pull-request steps; perform those actions
+when I authorize them and the required tools/accounts are available.
+Leave merging and releasing to the maintainers.
+```
+
+The assistant needs access to the local files and development tools. Pushing and opening a PR also require your GitHub authentication and authorization; if those tools are unavailable, it should give you the commands and prepared PR text. Review its changes and verification evidence before submitting.
+
 ## Maintainer workflow and community conduct
 
 Be respectful, provide reproduction details, discuss the change rather than the person, and avoid posting personal information. Maintainers may remove spam, harassment or sensitive content. See [triage and review guidance](docs/guides/contribution-review.md) for request states, review evidence, private-feedback handling and the public launch checklist.
