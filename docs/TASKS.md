@@ -76,6 +76,8 @@
 
 ## Done
 
+- [x] Added a linked public hardware/device/workflow support catalog with prerequisites, setup links, current toolkit names, scoped verification evidence and contribution maintenance instructions. Source inventory, file/section links, documentation lint and whitespace checks passed. Physical compatibility and independent contributor trials remain separate.
+
 - [x] Added a copyable AI device-contribution prompt to CONTRIBUTING and linked it from the AI guide, including repository instructions, integration scope, evidence and fork-to-PR handoff. Independent contributor and physical-hardware trials remain open.
 
 - [x] Added the project-wide MIT license, matching package/lockfile metadata and explicit MIT contribution terms; reconciled active contribution guides and the plan. Documentation/whitespace checks and metadata-only comparison passed. Named ownership and independent acceptance trials remain open.

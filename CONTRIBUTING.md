@@ -10,6 +10,7 @@ Edge Studio code and documentation are licensed under the [MIT License](LICENSE)
 
 | I want to… | Start here |
 | --- | --- |
+| Check what is already supported | [Hardware, device and workflow catalog](docs/guides/supported-capabilities.md) |
 | Report something broken | [Report a problem](https://github.com/edge-studio-technology/edge-studio/issues/new/choose) |
 | Request a device, workflow feature or other improvement | [Public request forms](https://github.com/edge-studio-technology/edge-studio/issues/new/choose) |
 | Find something to help with | [Browse requests](https://github.com/edge-studio-technology/edge-studio/issues) and read the maintainer's latest scope/availability comment |
@@ -32,7 +33,7 @@ For a large change, new dependency, driver or architectural change, discuss the 
 
 1. Read the [quickstart](docs/guides/contributor-quickstart.md) and [architecture map](docs/guides/contributor-architecture.md). Work on a branch in your own fork from current upstream `dev`.
 2. Read the relevant [project rules](AGENTS.md#project-rules). Reuse existing patterns and services; keep changes focused on the agreed problem.
-3. Complete the whole user journey: validation, runtime behaviour, configuration screens, setup guide, saved-data compatibility and relevant tests. Hardware tests must name the actual model/OS and results.
+3. Complete the whole user journey: validation, runtime behaviour, configuration screens, setup guide, saved-data compatibility and relevant tests. Hardware tests must name the actual model/OS and results. Update the [support catalog](docs/guides/supported-capabilities.md) when capabilities change, with accurate requirements and verification evidence.
 4. Run the checks described in the quickstart and relevant recipe. Record failed or unrun checks honestly. Mocked tests do not verify physical hardware. AI-written code needs the same evidence and review.
 5. Update the affected operator guides and configuration documentation. Release-please prepares version bumps and release notes; do not manually bump the app version or add branch changelog sections. Public contributors do not need internal OpenProject access or internal ticket identifiers. PRs may link public issues.
 6. Push your branch to your fork and open a PR **against this repository's `dev` branch**. Use a Conventional title such as `feat(devices): support a new sensor` or `fix(workflows): handle an unavailable device`. Use the PR template and explain the problem, resulting behaviour, evidence and remaining limitations. Maintainers squash-merge contributions using that title. See the [release guide](docs/guides/releases.md) for types and release handling.
