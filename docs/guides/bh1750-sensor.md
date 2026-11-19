@@ -79,8 +79,14 @@ On 2026-11-19, the contributor installed the fork's source build on a spare/test
 | Architecture | `aarch64` |
 | Installed source commit | `e8fbe5329a218f5d9d43354a534f1bbf57d9a95d`, matching the pushed fork branch |
 | Source identity check | Contributor supplied output from `sudo git -C /opt/edge-studio rev-parse HEAD` |
-| Visible result | Contributor's screenshot shows a Workflow Inbox JSON preview from `BH1750 Light Sensor preview`, with `sensor: bh1750`, bus `1`, address `0x23`, `lux: 12.5` and `readAt: 2026-11-19T13:22:58Z` |
+| Visible result | The saved screenshot below shows a Workflow Inbox JSON preview from `BH1750 Light Sensor preview`, with `sensor: bh1750`, bus `1`, address `0x23`, `lux: 11.67` and `readAt: 2026-11-19T13:24:38Z` |
 
-This records a working physical prototype for the exact setup above, not a complete compatibility matrix. Local source modifications were not separately checked. The screenshot was shared in the contribution conversation and is not stored in this repository. The general success report does not provide individual results for scheduled reads, saved editing, dark/light comparisons, helper disable/re-enable, repeated Repair/token retention or disconnected-sensor recovery. Those cases and the alternate `0x5c` address are not individually evidenced here; record explicit results if exercising them for review. Linux PR CI remains required.
+![Contributor's BH1750 workflow JSON preview showing 11.67 lux on bus 1 at address 0x23](./bh1750-verification.png)
+
+The contributor supplied this image for publication after an earlier chat screenshot showed 12.5 lux at 13:22:58 UTC. The visible crop contains the generic workflow/device name, light reading, sensor bus/address and timestamps; no credentials, wallet details, hostnames, IP addresses or personal names are visible.
+
+After reviewing the physical checklist, the contributor reported "All tests done", following their earlier working-integration report. The checklist covered dark/light response, Devices manual read, scheduled reads, saved-device editing/reopening, I2C disable/re-enable, repeated Repair/settings/token retention and disconnection/recovery. This is an attributed completion statement; individual measurements and per-case logs/outcomes were not supplied, and the assistant did not independently perform those checks.
+
+This records a working physical prototype for the exact setup above, not a complete compatibility matrix. Local Pi source modifications and Compose service output were not supplied. Alternate address `0x5c`, other Pi/OS combinations and calibrated accuracy are not physically verified. The tested Pi source remains the implementation commit above. [Linux PR CI](https://github.com/edge-studio-technology/edge-studio/actions/runs/44534180081) passed `npm run check` and the Python helper/host-setup tests at integration commit `4058467a9d6767b20b8d3dcf3bb6430876aa314e`; later evidence-documentation changes require their own PR checks.
 
 Automated tests separately cover command timing/order, raw two-byte reads, lux conversion, dependency/I/O failures, configuration, API persistence, workflow reads and UI setup/editing. They do not establish physical accuracy or calibrate the sensor.

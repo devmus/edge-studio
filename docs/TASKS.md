@@ -58,7 +58,7 @@
 
 ### Devices and automation
 
-- [ ] Finish BH1750 contribution review in draft PR [#193](https://github.com/edge-studio-technology/edge-studio/pull/193): obtain passing Linux CI and record individual scheduled-read/editing/dark-light/helper-failure results if exercised. The contributor reported a working Pi 4 Model B Rev 1.4 on Debian 13.6/aarch64, supplied the matching installed commit and a workflow preview at bus 1/address 0x23 — see [BH1750 verification status](./guides/bh1750-sensor.md#verification-status).
+- [ ] Finish BH1750 maintainer review in draft PR [#193](https://github.com/edge-studio-technology/edge-studio/pull/193) and confirm CI for its latest evidence commit. The contributor personally confirmed MIT rights and reported completion of the physical checklist; the saved screenshot, Pi 4 Model B Rev 1.4/Debian 13.6/aarch64 setup, matching tested commit and evidence limits are in [BH1750 verification status](./guides/bh1750-sensor.md#verification-status). Linux CI passed at integration commit 4058467; no merge or release is implied.
 - [ ] PIR motion sensor: verify a PIR on the Pi through the UI and a `gpio_event_start` workflow, add beginner templates (motion → record, camera capture, stamp), and document defaults that change during hardware testing.
 - [ ] ESP32 MQTT boards: verify an ESP32 publishing JSON to the Pi broker is recorded by an MQTT workflow; add DHT22 (after hardware verification), button, analog, and PIR-over-MQTT templates; add first-message troubleshooting; document broker auth limitations.
 - [ ] Workflow templates for common GPIO, HTTP, webhook, schedule, output, MQTT, and Integritas flows.
