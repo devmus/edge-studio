@@ -28,6 +28,21 @@ function source(overrides: Partial<DataSource> = {}): DataSource {
 }
 
 describe("getDeviceSetupGuide / hasDeviceSetupGuide", () => {
+  it("gives BH1750 wiring, saved settings, verification and a disabled readable starter workflow", () => {
+    const device = source({ type: "bh1750-sensor", config: { sensor: "bh1750", bus: 1, address: "0x5c" } });
+    const guide = getDeviceSetupGuide(device)!;
+    expect(guide.title).toBe("BH1750 Light Sensor Setup");
+    expect(guide.docPath).toBe("docs/guides/bh1750-sensor.md");
+    expect(guide.sections.find((section) => section.title === "Saved settings")?.table).toContainEqual(["I2C address", "0x5c"]);
+    expect(guide.sections.find((section) => section.title === "Wiring")?.table).toContainEqual(["VIN", "3.3V / physical pin 1"]);
+    const action = guide.actions![0];
+    expect(action.kind).toBe("create_workflow");
+    if (action.kind !== "create_workflow") throw new Error("Expected a workflow action");
+    const workflow = action.workflow(device);
+    expect(workflow.enabled).toBe(false);
+    expect(workflow.blocks.map((block) => block.type)).toEqual(["manual_start", "fetch_data_source", "show_preview"]);
+    expect(workflow.blocks[1].config).toEqual({ sourceId: device.id });
+  });
   it("dispatches the esp32-mqtt-board guide for an mqtt source with that profile", () => {
     const guide = getDeviceSetupGuide(source({ type: "mqtt", config: { profile: "esp32-mqtt-board" } }));
     expect(guide?.title).toBe("ESP32 MQTT Board Setup Guide");

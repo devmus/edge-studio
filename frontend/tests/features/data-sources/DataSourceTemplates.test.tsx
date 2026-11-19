@@ -44,6 +44,7 @@ describe("templateIcon", () => {
     expect(templateIcon(findTemplate("GPIO LED")).displayName).toBe("Lightbulb");
     expect(templateIcon(findTemplate("Raspberry Pi Camera")).displayName).toBe("Camera");
     expect(templateIcon(findTemplate("BME280 Environmental Sensor")).displayName).toBe("ThermometerSun");
+    expect(templateIcon(findTemplate("BH1750 Light Sensor")).displayName).toBe("Lightbulb");
     expect(templateIcon(findTemplate("Device System Data")).displayName).toBe("HardDrive");
   });
 });

@@ -129,7 +129,7 @@ async function validateAutomationBlockGraph(blocks: ValidationBlock[]): Promise<
   const hardwareCapabilities: HardwareCapabilities = {
     camera: blocks.some((block) => block.enabled && block.type === "capture_camera") || hostBackedSourceTypes.has("pi-camera") ? normalizeRuntimeCapability(await getCameraCapability()) : null,
     gpio: hostBackedSourceTypes.has("gpio-input") || hostBackedSourceTypes.has("gpio-output") ? getGpioInputCapability() : null,
-    sensors: hostBackedSourceTypes.has("bme-sensor") ? await getSensorHelperCapability() : null,
+    sensors: hostBackedSourceTypes.has("bme-sensor") || hostBackedSourceTypes.has("bh1750-sensor") ? await getSensorHelperCapability() : null,
     mqtt: hostBackedSourceTypes.has("mqtt") || hostBackedSourceTypes.has("mqtt-output") ? { enabled: env.mqttBrokerEnabled, available: env.mqttBrokerEnabled, reason: env.mqttBrokerEnabled ? null : "Local MQTT broker is disabled. Enable it from Devices -> Hardware support." } : null,
   };
 
@@ -248,7 +248,7 @@ type RuntimeCapability = { enabled?: boolean; available: boolean; reason?: strin
 type HardwareCapabilities = {
   camera: RuntimeCapability;
   gpio: RuntimeCapability;
-  sensors: RuntimeCapability;
+  sensors: (RuntimeCapability & { supportedSensors?: string[] }) | null;
   mqtt: RuntimeCapability;
 };
 
@@ -259,7 +259,10 @@ function validateSourceHardware(
   issues: AutomationValidationIssue[],
 ) {
   if (source.type === "pi-camera") validateHardwareCapability(block, "camera", hardwareCapabilities.camera, issues);
-  if (source.type === "bme-sensor") validateHardwareCapability(block, "sensors", hardwareCapabilities.sensors, issues);
+  if (source.type === "bme-sensor" || source.type === "bh1750-sensor") validateHardwareCapability(block, "sensors", hardwareCapabilities.sensors, issues);
+  if (source.type === "bh1750-sensor" && hardwareCapabilities.sensors?.available && !hardwareCapabilities.sensors.supportedSensors?.includes("bh1750")) {
+    addIssue(issues, "error", "sensors.unsupported_model", "The sensor helper is not reporting BH1750 support. Repair I2C sensors from Devices -> Hardware support.", block);
+  }
   if (source.type === "gpio-input" || source.type === "gpio-output") validateHardwareCapability(block, "gpio", hardwareCapabilities.gpio, issues);
   if ((source.type === "mqtt" || source.type === "mqtt-output") && usesLocalMqttBroker(source.config)) validateHardwareCapability(block, "mqtt", hardwareCapabilities.mqtt, issues);
 }
@@ -308,7 +311,7 @@ function isOutputTarget(type: string) {
 }
 
 function isReadableDataSource(type: string) {
-  return type === "json-api" || type === "bme-sensor" || type === "device-system-data";
+  return type === "json-api" || type === "bme-sensor" || type === "bh1750-sensor" || type === "device-system-data";
 }
 
 function validateOutputBodyConfig(block: ValidationBlock, config: BlockConfig, targetType: string, issues: AutomationValidationIssue[]) {

@@ -58,6 +58,7 @@
 
 ### Devices and automation
 
+- [ ] Verify Adafruit BH1750 STEMMA QT product 4681 on the contributor's Pi: record model/OS/architecture/source identity; check default-address dark/light/manual/scheduled readings, saved editing, repeated helper repair/disable/re-enable and disconnection/recovery. Software integration and automated checks are implemented; physical evidence, interactive UI screenshots and passing Linux PR CI remain open — see [BH1750 verification status](./guides/bh1750-sensor.md#verification-status).
 - [ ] PIR motion sensor: verify a PIR on the Pi through the UI and a `gpio_event_start` workflow, add beginner templates (motion → record, camera capture, stamp), and document defaults that change during hardware testing.
 - [ ] ESP32 MQTT boards: verify an ESP32 publishing JSON to the Pi broker is recorded by an MQTT workflow; add DHT22 (after hardware verification), button, analog, and PIR-over-MQTT templates; add first-message troubleshooting; document broker auth limitations.
 - [ ] Workflow templates for common GPIO, HTTP, webhook, schedule, output, MQTT, and Integritas flows.
@@ -76,6 +77,8 @@
 - [ ] Sanity-check two catalog exclusions added beyond the Minima RPC console plan's named list during `help`-output reconciliation: `createtokenfrom` (same raw-`privatekey:` risk as the named `*from` commands) and `decryptbackup` (can turn an encrypted backup into plaintext key material).
 
 ## Done
+
+- [x] Implemented BH1750 lux reads through the existing I2C helper, backend/API/workflows, device setup/editing and in-app/operator guides. Full application coverage suites, lint/docs/Knip/typechecks, builds, application audits, Compose configuration and 37 Python tests passed; full check retains Windows root-script failures and Docker image build is blocked by the unavailable Linux daemon. Physical verification and publication remain separate follow-ups.
 
 - [x] Added the owner-approved GHSA-fc5q-39xc-vjpf exception for development-only picomatch 4.0.7, expiring 2026-12-02 00:00 UTC. Other advisories and production audits remain blocking. Verified 51 audit/docs/policy tests, lint, syntax/whitespace checks and all six real full/production app audits; normal PR CI remains required. Rationale is in ADR 0044; the completed implementation plan is retired.
 

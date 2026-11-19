@@ -106,6 +106,12 @@ export const inputTemplates: DataSourceTemplate[] = [
     config: { sensor: "bme680", bus: 1, address: "0x76" },
   },
   {
+    title: "BH1750 Light Sensor",
+    description: "Read ambient light in lux from an Adafruit BH1750 STEMMA QT I2C sensor",
+    type: "bh1750-sensor",
+    config: { sensor: "bh1750", bus: 1, address: "0x23" },
+  },
+  {
     title: "Device System Data",
     description: "Read local device specs, performance, network status, and coarse locale data",
     type: "device-system-data",
@@ -177,6 +183,7 @@ export function templateIcon(template: DataSourceTemplate) {
   if (template.type === "gpio-output") return Lightbulb;
   if (template.type === "pi-camera") return Camera;
   if (template.type === "bme-sensor") return ThermometerSun;
+  if (template.type === "bh1750-sensor") return Lightbulb;
   if (template.type === "device-system-data") return HardDrive;
   return Cpu;
 }
@@ -269,7 +276,7 @@ export function LocalServicesCard({
       name: "sensors",
       label: "I2C sensors",
       title: "I2C sensors",
-      description: "Install or disable the host sensor helper used by BME280/BME680 I2C sensor reads.",
+      description: "Install or disable the host sensor helper used by BME280/BME680 and BH1750 I2C sensor reads.",
       icon: ThermometerSun,
       capability: sensors,
       onEnable: onEnableSensors,

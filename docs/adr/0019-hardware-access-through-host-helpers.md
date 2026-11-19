@@ -18,11 +18,12 @@ for I2C, whose setup steps on Raspberry Pi OS are fixed and already shown in the
 
 ## Decision
 
-- **Host-side helpers for device I/O.** Camera capture and BME sensor reads run in small,
+- **Host-side helpers for device I/O.** Camera capture and BME/BH1750 sensor reads run in small,
   opt-in, token-protected host Python helpers (`camera-helper/`, `sensor-helper/`) reachable from
   the Docker subnet, exposing only allowlisted reads for supported devices. The backend container
   gets no `/dev/i2c-*` or camera device and no native I2C dependency. GPIO input is the exception:
   explicit `/dev/gpiochip0` access with `gpiomon`, input-only.
+- **BH1750 measurements use raw I2C in the existing sensor helper.** Enable/repair installs `smbus2` in the existing managed virtualenv. The helper powers on/resets the chip, sets standard MTreg 69 (`0x42`, `0x65`), requests one-shot high resolution (`0x20`), waits the documented worst-case 180 ms, and reads exactly two bytes without sending a register byte. It converts the big-endian count to lux by dividing by 1.2. These values come from the [ROHM BH1750FVI datasheet linked by Adafruit](https://www.mouser.com/datasheet/2/348/bh1750fvi-e-186247.pdf); no physical timing claim is made. A helper-local lock serializes BH1750 requests so overlapping manual/workflow reads cannot restart each other's conversions. Only bus/address are operator settings; fixed mode avoids a range/calibration UI for the initial lux-reading scope. The helper reports model support only when `smbus2` imports, and callers warn when an older helper lacks it.
 - **A root host agent for enabling hardware after install.** `install.sh` always installs
   `edge-studio-host-agent` (systemd, Python stdlib), with `HOST_AGENT_URL`/`HOST_AGENT_TOKEN` passed
   only to the backend. The backend reaches it through admin-gated `/api/host-capabilities` routes.
@@ -49,6 +50,8 @@ for I2C, whose setup steps on Raspberry Pi OS are fixed and already shown in the
 
 - **Mount `/dev/i2c-1` into the backend with a native Node I2C library.** Simpler at first, but
   fragile native builds on ARM/Docker and hardware access inside the app container.
+- **Use SMBus register-block reads for BH1750.** They send an extra command/register byte; BH1750 expects a raw two-byte I2C read after conversion. `smbus2.i2c_rdwr` provides that transaction without a new hardware service.
+- **Use the Adafruit CircuitPython/Blinka stack for BH1750.** Valid upstream option, but introduces a broader board abstraction and dependency chain when the existing helper already owns bus/address selection and needs only a fixed command/read sequence.
 - **A privileged or root backend container.** Defeats the non-root boundary.
 - **A generic command runner or service-management endpoint.** Turns the root agent into a shell.
 - **Fold host management into the backend or `update-agent`.** The backend can't have host
@@ -72,6 +75,7 @@ for I2C, whose setup steps on Raspberry Pi OS are fixed and already shown in the
 
 ## History
 
+- 2026-11-19: BH1750 raw I2C lux reads, fixed conversion timing, managed smbus2 dependency and serialized measurements within the existing sensor capability.
 - 2026-11-03: Terminal uninstaller and Settings instructions; retained-data and host-resource ownership boundaries.
 - 2026-09-10: Root host agent with per-capability actions, and the explicit I2C prerequisite action
   (was "I2C Prerequisite Setup Action").

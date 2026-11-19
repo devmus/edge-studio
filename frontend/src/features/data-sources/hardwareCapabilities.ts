@@ -2,7 +2,7 @@ import type { DataSource, DataSourceCapabilities, DataSourceTemplate, HostCapabi
 
 export function hostCapabilityForDeviceType(type: DataSource["type"] | DataSourceTemplate["type"]): HostCapability["name"] | null {
   if (type === "pi-camera") return "camera";
-  if (type === "bme-sensor") return "sensors";
+  if (type === "bme-sensor" || type === "bh1750-sensor") return "sensors";
   if (type === "gpio-input" || type === "gpio-output") return "gpio";
   return null;
 }
@@ -15,7 +15,7 @@ export function hostCapabilityForDevice(source: DataSource, hostCapabilities: Ho
 
 export function fallbackCapabilityState(source: DataSource, capabilities: DataSourceCapabilities | null) {
   if (source.type === "pi-camera") return { enabled: Boolean(capabilities?.camera?.enabled), available: Boolean(capabilities?.camera?.available), reason: capabilities?.camera?.reason ?? null };
-  if (source.type === "bme-sensor") return { enabled: Boolean(capabilities?.sensors?.enabled), available: Boolean(capabilities?.sensors?.available), reason: capabilities?.sensors?.reason ?? null };
+  if (source.type === "bme-sensor" || source.type === "bh1750-sensor") return { enabled: Boolean(capabilities?.sensors?.enabled), available: Boolean(capabilities?.sensors?.available), reason: capabilities?.sensors?.reason ?? null };
   if (source.type === "gpio-input" || source.type === "gpio-output") return { enabled: Boolean(capabilities?.gpioInput.enabled ?? capabilities?.gpioInput.available), available: Boolean(capabilities?.gpioInput.available), reason: capabilities?.gpioInput.reason ?? null };
   if (usesLocalMqttBroker(source)) {
     const enabled = Boolean(capabilities?.mqttBroker?.enabled);

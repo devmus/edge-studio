@@ -456,7 +456,7 @@ export function DataSourcesPage() {
   }
 
   const setupGuideBme680SupportWarning = setupGuideSource
-    ? bme680SupportWarning(setupGuideSource, capabilities)
+    ? sensorSupportWarning(setupGuideSource, capabilities)
     : null;
 
   return (
@@ -646,7 +646,10 @@ function guideWorkflowIdsForSource(source: DataSource, workflowIds: Record<strin
   );
 }
 
-function bme680SupportWarning(source: DataSource, capabilities: DataSourceCapabilities | null) {
+function sensorSupportWarning(source: DataSource, capabilities: DataSourceCapabilities | null) {
+  if (source.type === "bh1750-sensor" && capabilities?.sensors?.available && !capabilities.sensors.supportedSensors?.includes("bh1750")) {
+    return "The sensor helper is not reporting BH1750 support. Repair I2C sensors from Devices -> Hardware support to refresh the helper and install smbus2.";
+  }
   if (source.type !== "bme-sensor" || source.config.sensor !== "bme680") return null;
   if (!capabilities?.sensors?.enabled || capabilities.sensors.available === false) return null;
   const supportedSensors = capabilities.sensors.supportedSensors;
