@@ -67,6 +67,20 @@ For regular readings, replace the manual start with **Schedule**, select an inte
 
 ## Verification status
 
-Physical verification has **not been performed** for this contribution. The contributor has one sensor available; its Pi model, OS/architecture and observed results remain to be recorded. Mocked tests cover command timing/order, raw two-byte reads, lux conversion, dependency/I/O failures, configuration, API persistence, workflow reads and UI setup/editing.
+### Contributor-reported prototype test
 
-On an authorized test Pi, record the exact sensor, Pi model, OS/architecture, source commit and local modifications. Verify default-address manual reads, dark/light changes, saved-device editing, starter and scheduled workflows, helper disable/re-enable, repeated Repair with retained settings/token, disconnected-sensor errors and recovery. Test the alternate address only if deliberately changing the board's address. Include actual results with the PR; do not mark physical support verified from automated tests.
+On 2026-11-19, the contributor installed the fork's source build on a spare/test Pi and reported the integration "fully working in every way". The assistant did not independently access or operate that Pi.
+
+| Item | Reported setup / evidence |
+| --- | --- |
+| Sensor | One Adafruit BH1750 STEMMA QT / Qwiic, product 4681, direct Pi I2C |
+| Pi | Raspberry Pi 4 Model B Rev 1.4 |
+| OS | Debian GNU/Linux 13 (trixie), `DEBIAN_VERSION_FULL=13.6` |
+| Architecture | `aarch64` |
+| Installed source commit | `e8fbe5329a218f5d9d43354a534f1bbf57d9a95d`, matching the pushed fork branch |
+| Source identity check | Contributor supplied output from `sudo git -C /opt/edge-studio rev-parse HEAD` |
+| Visible result | Contributor's screenshot shows a Workflow Inbox JSON preview from `BH1750 Light Sensor preview`, with `sensor: bh1750`, bus `1`, address `0x23`, `lux: 12.5` and `readAt: 2026-11-19T13:22:58Z` |
+
+This records a working physical prototype for the exact setup above, not a complete compatibility matrix. Local source modifications were not separately checked. The screenshot was shared in the contribution conversation and is not stored in this repository. The general success report does not provide individual results for scheduled reads, saved editing, dark/light comparisons, helper disable/re-enable, repeated Repair/token retention or disconnected-sensor recovery. Those cases and the alternate `0x5c` address are not individually evidenced here; record explicit results if exercising them for review. Linux PR CI remains required.
+
+Automated tests separately cover command timing/order, raw two-byte reads, lux conversion, dependency/I/O failures, configuration, API persistence, workflow reads and UI setup/editing. They do not establish physical accuracy or calibrate the sensor.
