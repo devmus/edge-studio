@@ -6,6 +6,8 @@ alwaysApply: false
 
 # Docker / Pi Rules
 
+- PIM576 text output uses the opt-in display-helper service (`ENABLE_DISPLAYS=true`), bound to the configured Docker gateway with a backend-only token; never mount SPI/GPIO into the backend for display output. Preserve `.venv-display-helper`, its token and port across installer refreshes. First adoption on an older host agent requires an installer refresh to install the new helper file; later signed artifacts include it in their fixed allowlist.
+
 - UI is exposed on HTTPS at `${FRONTEND_PORT:-8080}` (container port 443) with a self-signed cert in `${DATA_DIR:-./data}/certs`.
 - Backend is internal behind frontend `/api` proxy.
 - SQLite data lives in `${DATA_DIR:-./data}` mounted to `/data`.

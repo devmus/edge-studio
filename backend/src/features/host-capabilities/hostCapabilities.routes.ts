@@ -3,9 +3,30 @@ import { dependencyUnavailable } from "../../shared/api-error.js";
 import { recordAuditEvent } from "../auth/audit.service.js";
 import { requireRole } from "../auth/auth.middleware.js";
 import { pauseCameraRetention } from "../retention/camera-retention.service.js";
+import { disableHostDisplayCapability, enableHostDisplayCapability } from "./hostCapabilities.service.js";
 import { disableHostCameraCapability, disableHostGpioCapability, disableHostMqttCapability, disableHostSensorCapability, enableHostCameraCapability, enableHostGpioCapability, enableHostMqttCapability, enableHostSensorCapability, listHostCapabilities, setupHostSensorPrerequisites, type HostCapability } from "./hostCapabilities.service.js";
 
 export const hostCapabilitiesRouter = Router();
+
+hostCapabilitiesRouter.post("/displays/enable", requireRole("admin"), async (req, res) => {
+  try {
+    const result = await enableHostDisplayCapability();
+    recordHostCapabilityAudit(req.user?.id, "enable", result.capability);
+    return res.json(result);
+  } catch (error) {
+    return dependencyUnavailable(res, error instanceof Error ? error.message : "Failed to enable SPI displays");
+  }
+});
+
+hostCapabilitiesRouter.post("/displays/disable", requireRole("admin"), async (req, res) => {
+  try {
+    const result = await disableHostDisplayCapability();
+    recordHostCapabilityAudit(req.user?.id, "disable", result.capability);
+    return res.json(result);
+  } catch (error) {
+    return dependencyUnavailable(res, error instanceof Error ? error.message : "Failed to disable SPI displays");
+  }
+});
 
 hostCapabilitiesRouter.get("/", async (_req, res) => {
   try {

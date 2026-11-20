@@ -43,6 +43,7 @@ import {
   type DeviceGuideAction,
 } from "../features/data-sources/deviceSetupGuides";
 import { Esp32SetupGuide } from "../features/data-sources/Esp32FirmwareSetup";
+import { enableDisplaySupport, disableDisplaySupport } from "../features/data-sources/dataSourcesApi";
 import { useDeviceFormFields } from "../features/data-sources/useDeviceFormFields";
 
 const HARDWARE_REFRESH_TIMEOUT_MS = 30000;
@@ -244,6 +245,20 @@ export function DataSourcesPage() {
   function needsHardwareRepair(name: HostCapability["name"]) {
     const capability = hostCapabilities.find((item) => item.name === name);
     return Boolean(capability?.enabled && !capability.available);
+  }
+
+  async function enableDisplayHardware() {
+    await runHardwareAction(() => enableDisplaySupport(), {
+      modalTitle: "Enabling or repairing SPI displays", progressTitle: "Installing display support",
+      description: "Installing the managed display driver and restarting the helper. First setup can take several minutes.",
+    }, { name: "displays", enabled: true, available: true });
+  }
+
+  async function disableDisplayHardware() {
+    await runHardwareAction(() => disableDisplaySupport(), {
+      modalTitle: "Disabling SPI displays", progressTitle: "Stopping display support",
+      description: "Stopping the helper and future display updates. The panel may retain its last image until power is removed.",
+    }, { name: "displays", enabled: false });
   }
 
   async function enableCameraHardware() {
@@ -473,6 +488,8 @@ export function DataSourcesPage() {
         onEnableGpio={enableGpioHardware}
         onDisableGpio={disableGpioHardware}
         onEnableSensors={enableSensorHardware}
+        onEnableDisplays={enableDisplayHardware}
+        onDisableDisplays={disableDisplayHardware}
         onDisableSensors={disableSensorHardware}
         onSetupSensorPrerequisites={setupSensorHardwarePrerequisites}
         onEnableMqtt={enableMqttHardware}
@@ -622,7 +639,7 @@ export function DataSourcesPage() {
           busy={busy}
           loading={initialLoading}
           onRead={(source) => run(() => readDataSource(source.id), "Manual read completed")}
-          onTestOutput={(source) => run(() => testDataSourceOutput(source.id), "Test pulse sent")}
+          onTestOutput={(source) => run(() => testDataSourceOutput(source.id), source.type === "spi-display" ? "Test text sent to display" : "Test pulse sent")}
           onOpenSetupGuide={setSetupGuideSource}
           onEdit={editSource}
           onDelete={setDeleteTarget}

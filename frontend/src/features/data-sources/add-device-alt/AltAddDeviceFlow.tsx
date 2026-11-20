@@ -108,7 +108,7 @@ export function AltAddDeviceFlow({
     setStep(parentStep(step));
   }
 
-  const options = stepOptions(step, setStep, selectTemplate).filter((option) => option.title !== "BH1750 Light Sensor" || capabilities?.sensors?.enabled);
+  const options = stepOptions(step, setStep, selectTemplate).filter((option) => (option.title !== "BH1750 Light Sensor" || capabilities?.sensors?.enabled) && (option.title !== "PIM576 SPI LCD" || capabilities?.displays?.enabled));
   const provisioningSteps = altDeviceProvisioningSteps(fields);
   const provisioningStep = provisioningSteps[provisioningStepIndex];
   const isFinalProvisioningStep = provisioningStepIndex === provisioningSteps.length - 1;
@@ -238,6 +238,7 @@ export function AltAddDeviceFlow({
     >
       {step === "sensor-templates" && !capabilities?.sensors?.enabled && <p className="type-body text-text-secondary">Enable I2C sensors in Devices → Hardware support to add a BH1750 light sensor.</p>}
       <SetupDevicePicker step={step} options={options} />
+      {step === "root" && !capabilities?.displays?.enabled && <p className="type-body text-text-secondary">Enable SPI displays in Devices → Hardware support to add a PIM576 LCD.</p>}
     </Modal>
   );
 }
@@ -381,6 +382,7 @@ function stepOptions(
         { title: "Protocols", description: "Receive data or send commands using REST APIs, MQTT, or webhooks.", icon: Radio, action: () => setStep("protocols") },
         { title: "Sensors", description: "Add GPIO and environmental sensor devices attached to this Pi.", icon: ThermometerSun, action: () => setStep("sensors") },
         { title: "Actuators", description: "Control physical devices connected to this Pi.", icon: Lightbulb, action: () => setStep("actuators") },
+        templateOption("PIM576 SPI LCD", "Display text and workflow variables on the Pi-connected screen.", findOutputTemplate("PIM576 SPI LCD"), selectTemplate),
         templateOption("Raspberry Pi Camera", "Capture photos or short video clips from workflows.", findInputTemplate("Raspberry Pi Camera"), selectTemplate),
         templateOption("This Pi system data", "Record local device specifications, performance, network status, and coarse locale data.", findInputTemplate("Device System Data"), selectTemplate),
       ];

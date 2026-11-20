@@ -81,7 +81,7 @@ describe("resolveTemplateConfig", () => {
 describe("LocalServicesCard", () => {
   it("shows the disabled hardware summary when there is no mqttBroker capability", () => {
     render(<LocalServicesCard capabilities={null} />);
-    expect(screen.getByText("0 of 4 enabled")).toBeInTheDocument();
+    expect(screen.getByText("0 of 5 enabled")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "MQTT: Disabled" })).toBeInTheDocument();
   });
 
@@ -91,7 +91,7 @@ describe("LocalServicesCard", () => {
       mqttBroker: { enabled: true, internalUrl: "mqtt://mqtt:1883", publicHost: "pi.local", publicPort: 1883 },
     };
     render(<LocalServicesCard capabilities={capabilities} hostCapabilities={enabledHostCapabilities} />);
-    expect(screen.getByText("4 of 4 enabled")).toBeInTheDocument();
+    expect(screen.getByText("4 of 5 enabled")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "MQTT: Available" })).toBeInTheDocument();
     expect(screen.queryByText("mqtt://pi.local:1883")).not.toBeInTheDocument();
 

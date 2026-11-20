@@ -39,7 +39,7 @@ describe("hostCapabilities.service", () => {
     envMock.hostAgentUrl = "";
     const result = await service.listHostCapabilities();
 
-    assert.deepEqual(result.items.map((item) => item.name), ["camera", "gpio", "sensors", "mqtt"]);
+    assert.deepEqual(result.items.map((item) => item.name), ["camera", "gpio", "sensors", "mqtt", "displays"]);
     assert.equal(result.items[0].available, false);
     assert.equal(result.items[0].reason, "Host agent is not configured");
     assert.equal(fetchMock.mock.calls.length, 0);
@@ -69,6 +69,8 @@ describe("hostCapabilities.service", () => {
     await service.disableHostSensorCapability();
     await service.enableHostMqttCapability();
     await service.disableHostMqttCapability();
+    await service.enableHostDisplayCapability();
+    await service.disableHostDisplayCapability();
 
     assert.deepEqual(fetchMock.mock.calls.map((call) => [call[0], (call[1] as RequestInit).method]), [
       ["http://host-agent/capabilities/camera/apply", "POST"],
@@ -78,7 +80,9 @@ describe("hostCapabilities.service", () => {
       ["http://host-agent/capabilities/sensors/apply", "POST"],
       ["http://host-agent/capabilities/sensors/disable", "POST"],
       ["http://host-agent/capabilities/mqtt/apply", "POST"],
-      ["http://host-agent/capabilities/mqtt/disable", "POST"]
+      ["http://host-agent/capabilities/mqtt/disable", "POST"],
+      ["http://host-agent/capabilities/displays/apply", "POST"],
+      ["http://host-agent/capabilities/displays/disable", "POST"]
     ]);
   });
 

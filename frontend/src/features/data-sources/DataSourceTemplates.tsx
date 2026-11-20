@@ -6,6 +6,7 @@ import {
   Globe2,
   HardDrive,
   Lightbulb,
+  Monitor,
   RefreshCw,
   Settings2,
   Radio,
@@ -139,6 +140,12 @@ export const inputTemplates: DataSourceTemplate[] = [
 
 export const outputTemplates: DataSourceTemplate[] = [
   {
+    title: "PIM576 SPI LCD",
+    description: "Display workflow text on Pimoroni's 1.54-inch 240×240 SPI screen",
+    type: "spi-display",
+    config: { model: "pim576", rotation: 0 },
+  },
+  {
     title: "GPIO LED",
     description: "Low-current LED output target controlled by workflows",
     type: "gpio-output",
@@ -175,6 +182,7 @@ export const outputTemplates: DataSourceTemplate[] = [
 ];
 
 export function templateIcon(template: DataSourceTemplate) {
+  if (template.type === "spi-display") return Monitor;
   if (template.config.profile === "pir-motion") return ShieldAlert;
   if (template.config.profile === "esp32-mqtt-board") return Cpu;
   if (template.type === "json-api" || template.type === "http-output") return Globe2;
@@ -210,6 +218,8 @@ export function LocalServicesCard({
   onDisableGpio,
   onEnableSensors,
   onDisableSensors,
+  onEnableDisplays,
+  onDisableDisplays,
   onEnableMqtt,
   onDisableMqtt,
   onSetupSensorPrerequisites,
@@ -224,6 +234,8 @@ export function LocalServicesCard({
   onDisableGpio?: () => Promise<void>;
   onEnableSensors?: () => Promise<void>;
   onDisableSensors?: () => Promise<void>;
+  onEnableDisplays?: () => Promise<void>;
+  onDisableDisplays?: () => Promise<void>;
   onEnableMqtt?: () => Promise<void>;
   onDisableMqtt?: () => Promise<void>;
   onSetupSensorPrerequisites?: () => Promise<void>;
@@ -242,6 +254,12 @@ export function LocalServicesCard({
   const lanUrl = `mqtt://${publicHost}:${publicPort}`;
   const internalUrl = mqtt?.internalUrl ?? broker?.internalUrl ?? "mqtt://mqtt:1883";
   const hardwareItems: HardwareItem[] = [
+    {
+      name: "displays", label: "SPI displays", title: "SPI displays",
+      description: "Install or disable the host helper for PIM576 text display workflows.",
+      icon: Monitor, capability: hostCapabilities.find((capability) => capability.name === "displays"),
+      onEnable: onEnableDisplays, onDisable: onDisableDisplays,
+    },
     {
       name: "camera",
       label: "Camera",
@@ -632,6 +650,11 @@ function HardwarePrerequisites({
 type PrerequisiteCommand = { label: string; command: string; description: string };
 
 const prerequisiteGuidance: Partial<Record<HostCapability["name"], PrerequisiteCommand[]>> = {
+  displays: [
+    { label: "Enable SPI", command: "sudo raspi-config", description: "On Raspberry Pi OS, select Interface Options -> SPI -> Enable. On Debian, enable dtparam=spi=on in the Pi boot configuration. Reboot if needed." },
+    { label: "Check host devices", command: "ls -l /dev/spidev0.0 /dev/gpiochip0", description: "Both devices must exist. The helper user needs the spi and gpio groups." },
+    { label: "Python environment prerequisites", command: "sudo apt-get update\nsudo apt-get install -y python3-venv python3-dev build-essential", description: "Run if virtualenv creation or native Python dependency builds fail. Enable/Repair then installs st7789 and Pillow in its managed environment." },
+  ],
   camera: [
     {
       label: "Install camera tools",

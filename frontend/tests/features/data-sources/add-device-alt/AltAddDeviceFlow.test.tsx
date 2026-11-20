@@ -50,6 +50,19 @@ describe("AltAddDeviceFlow", () => {
     expect(screen.getByRole("button", { name: /This Pi system data/ })).toBeInTheDocument();
   });
 
+  it("saves the PIM576 output with a chosen rotation through the active wizard", async () => {
+    createDataSource.mockResolvedValue({ item: { id: "lcd", name: "PIM576 SPI LCD", type: "spi-display" } });
+    renderFlow({ capabilities: { gpioInput: { available: false, devicePath: "", reason: null }, displays: { enabled: true, available: true, reason: null, supportedModels: ["pim576"] } } });
+    await userEvent.click(screen.getByRole("button", { name: /PIM576 SPI LCD/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Next step (2)" }));
+    await userEvent.click(screen.getByRole("button", { name: "Next step (3)" }));
+    await userEvent.selectOptions(screen.getByLabelText("Rotation"), "180");
+    await userEvent.click(screen.getByRole("button", { name: "Next step (4)" }));
+    expect(screen.getByText("180°")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Add device" }));
+    await waitFor(() => expect(createDataSource).toHaveBeenCalledWith(expect.objectContaining({ type: "spi-display", config: { model: "pim576", rotation: 180 } })));
+  });
+
   it("opens the system-data provisioning flow from the root picker", async () => {
     renderFlow();
     await userEvent.click(screen.getByRole("button", { name: /This Pi system data/ }));

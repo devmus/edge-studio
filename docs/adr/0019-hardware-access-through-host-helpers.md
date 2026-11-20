@@ -24,11 +24,12 @@ for I2C, whose setup steps on Raspberry Pi OS are fixed and already shown in the
   gets no `/dev/i2c-*` or camera device and no native I2C dependency. GPIO input is the exception:
   explicit `/dev/gpiochip0` access with `gpiomon`, input-only.
 - **BH1750 measurements use raw I2C in the existing sensor helper.** Enable/repair installs `smbus2` in the existing managed virtualenv. The helper powers on/resets the chip, sets standard MTreg 69 (`0x42`, `0x65`), requests one-shot high resolution (`0x20`), waits the documented worst-case 180 ms, and reads exactly two bytes without sending a register byte. It converts the big-endian count to lux by dividing by 1.2. These values come from the [ROHM BH1750FVI datasheet linked by Adafruit](https://www.mouser.com/datasheet/2/348/bh1750fvi-e-186247.pdf); no physical timing claim is made. A helper-local lock serializes BH1750 requests so overlapping manual/workflow reads cannot restart each other's conversions. Only bus/address are operator settings; fixed mode avoids a range/calibration UI for the initial lux-reading scope. The helper reports model support only when `smbus2` imports, and callers warn when an older helper lacks it.
+- **SPI display output stays in a dedicated opt-in helper.** PIM576 title/text rendering uses Pillow and Pimoroni's `st7789==1.0.1` driver in a retained virtualenv, with one fixed SPI0 CE0/DC GPIO25/BL GPIO24 layout and only rotation editable. This keeps SPI/GPIO dependencies outside the non-root backend, avoids arbitrary pin/command or file/URL rendering endpoints, and reuses the workflow's existing output budget and variable interpolation. The helper binds to the configured Docker gateway and requires its own token. Fixed white-on-black text, 16 MHz SPI, zero offsets and a 20-pixel font keep the initial scope small; panel geometry and Debian GPIO compatibility still need physical evidence. Initial adoption requires installer refresh because an older agent's fixed artifact allowlist cannot extract a newly added helper file; subsequent artifacts include it. No signature/allowlist boundary is weakened to bypass that transition.
 - **A root host agent for enabling hardware after install.** `install.sh` always installs
   `edge-studio-host-agent` (systemd, Python stdlib), with `HOST_AGENT_URL`/`HOST_AGENT_TOKEN` passed
   only to the backend. The backend reaches it through admin-gated `/api/host-capabilities` routes.
 - **Narrow API.** Each capability (`camera`, `sensors`, `gpio`, `mqtt`) has its own fixed action
-  set. The agent rejects unknown fields and never accepts command strings, package names, paths,
+  set, including `displays` for SPI text output. The agent rejects unknown fields and never accepts command strings, package names, paths,
   or service names. It manages only Edge Studio-owned helper units, `.env` keys, the generated GPIO
   override, and Compose restarts; it refuses to replace a user-managed override. Writes are atomic
   and retry-safe.
@@ -75,6 +76,7 @@ for I2C, whose setup steps on Raspberry Pi OS are fixed and already shown in the
 
 ## History
 
+- 2026-11-20: Added a narrow SPI text-display helper, fixed PIM576 wiring, managed driver dependencies and explicit first-adoption installer refresh.
 - 2026-11-19: BH1750 raw I2C lux reads, fixed conversion timing, managed smbus2 dependency and serialized measurements within the existing sensor capability.
 - 2026-11-03: Terminal uninstaller and Settings instructions; retained-data and host-resource ownership boundaries.
 - 2026-09-10: Root host agent with per-capability actions, and the explicit I2C prerequisite action

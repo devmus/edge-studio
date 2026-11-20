@@ -39,9 +39,45 @@ class HostAgentWriteTests(unittest.TestCase):
         self.agent.COMPOSE_OVERRIDE_FILE = self.root / "docker-compose.override.yml"
         self.agent.CAMERA_SERVICE_FILE = self.root / "edge-studio-camera-helper.service"
         self.agent.SENSOR_SERVICE_FILE = self.root / "edge-studio-sensor-helper.service"
+        self.agent.DISPLAY_SERVICE_FILE = self.root / "edge-studio-display-helper.service"
 
     def tearDown(self):
         self.tmp.cleanup()
+
+    def test_display_setup_and_repair_retain_token_environment_and_fixed_commands(self):
+        self.agent.ENV_FILE.write_text("DISPLAY_HELPER_TOKEN=existing-display-token\nENABLE_DISPLAYS=false\nKEEP_ME=true\n", encoding="utf-8")
+        code = self.root / "display-helper" / "edge_studio_display_helper.py"
+        code.parent.mkdir()
+        code.write_text("# helper", encoding="utf-8")
+        python = self.root / ".venv-display-helper" / "bin" / "python"
+        python.parent.mkdir(parents=True)
+        python.write_text("# retained", encoding="utf-8")
+        original_exists = self.agent.Path.exists
+        def exists(path):
+            return True if str(path).replace("\\", "/") in ("/dev/spidev0.0", "/dev/gpiochip0") else original_exists(path)
+        with patch.object(self.agent.Path, "exists", exists), patch.object(self.agent, "run", return_value=self.agent.subprocess.CompletedProcess([], 0, "", "")) as run, patch.object(self.agent, "helper_user", return_value="pi"), patch.object(self.agent, "restart_backend", return_value={"ok": True}), patch.object(self.agent, "display_status", return_value={"name": "displays", "enabled": True}):
+            self.agent.apply_displays()
+            self.agent.apply_displays()
+        self.assertEqual(python.read_text(encoding="utf-8"), "# retained")
+        self.assertIn("DISPLAY_HELPER_TOKEN=existing-display-token", self.agent.ENV_FILE.read_text())
+        self.assertIn("KEEP_ME=true", self.agent.ENV_FILE.read_text())
+        self.assertFalse(any("venv" in call.args[0] for call in run.call_args_list))
+        self.assertEqual(sum("st7789==1.0.1" in call.args[0] for call in run.call_args_list), 2)
+        self.assertIn("Environment=DISPLAY_HELPER_HOST=172.30.0.1", self.agent.DISPLAY_SERVICE_FILE.read_text())
+
+    def test_display_setup_fails_without_spi_before_writing_configuration(self):
+        with patch.object(self.agent.Path, "exists", return_value=False), patch.object(self.agent, "write_env") as write:
+            with self.assertRaisesRegex(ValueError, "Enable host SPI"):
+                self.agent.apply_displays()
+        write.assert_not_called()
+
+    def test_display_disable_is_repeatable_and_preserves_token(self):
+        self.agent.ENV_FILE.write_text("ENABLE_DISPLAYS=true\nDISPLAY_HELPER_TOKEN=retained\n", encoding="utf-8")
+        with patch.object(self.agent.shutil, "which", return_value="systemctl"), patch.object(self.agent, "run"), patch.object(self.agent, "restart_backend", return_value={"ok": True}), patch.object(self.agent, "display_status", return_value={"enabled": False}):
+            self.agent.disable_displays()
+            self.agent.disable_displays()
+        self.assertIn("ENABLE_DISPLAYS=false", self.agent.ENV_FILE.read_text())
+        self.assertIn("DISPLAY_HELPER_TOKEN=retained", self.agent.ENV_FILE.read_text())
 
     def test_atomic_write_keeps_existing_file_when_replace_fails(self):
         target = self.root / "target.txt"
