@@ -154,11 +154,12 @@ function run(overrides: Partial<AutomationRun> = {}): AutomationRun {
 
 describe("workflowHelpers", () => {
   it("WORKFLOW_INTERVAL_OPTIONS lists the supported schedule intervals", () => {
-    expect(WORKFLOW_INTERVAL_OPTIONS).toEqual([10, 30, 60, 300, 900, 3600]);
+    expect(WORKFLOW_INTERVAL_OPTIONS).toEqual([1, 10, 30, 60, 300, 900, 3600]);
   });
 
   it("conditionOperatorOptions covers all condition operators", () => {
     expect(conditionOperatorOptions.map((option) => option.value)).toEqual([
+      "changed_by_at_least",
       "equals",
       "not_equals",
       "greater_than",

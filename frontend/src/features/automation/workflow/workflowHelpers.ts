@@ -19,9 +19,10 @@ import type {
 import { blockHelp } from "./workflowBlockHelp";
 
 /** Pure workflow draft/config/label helpers (no React). Graph visuals stay in `workflow/canvas/`. */
-export const WORKFLOW_INTERVAL_OPTIONS = [10, 30, 60, 300, 900, 3600] as const;
+export const WORKFLOW_INTERVAL_OPTIONS = [1, 10, 30, 60, 300, 900, 3600] as const;
 
 export const conditionOperatorOptions: { value: ConditionOperator; label: string }[] = [
+  { value: "changed_by_at_least", label: "changed by at least" },
   { value: "equals", label: "equals" },
   { value: "not_equals", label: "does not equal" },
   { value: "greater_than", label: "is greater than" },

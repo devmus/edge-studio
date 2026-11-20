@@ -46,6 +46,7 @@ Integritas history is evidence. A security limit should not decide their product
   the first enabled `send_transaction`, `control_output`, `capture_camera`, or `stamp_integritas`
   block, for every trigger type. Stamping is included because automation stamps bypass the HTTP
   stamp limiter and spend external quota.
+- When all enabled privileged blocks are SPI display text outputs, the fixed ceiling is **5,000/hour**. Reads, variables and logic remain permitted. This supports one-second local display refreshes (3,600/hour with headroom) without increasing payment, capture, stamp or other-output exposure. Any mixed, missing or malformed privileged configuration receives 1,000. Classification is rechecked before each privileged action; a downgrade after reservation stops the run before its next effect. Workflow/target edits retain the same ledger and count existing usage against the applicable limit.
 - Reservations are timestamped rows in a SQLite ledger, unique per run, reserved and counted
   atomically. A run consumes once however many privileged blocks it has, and a failed action still
   consumes, since its effect may have happened. Workflow deletion deletes its ledger rows
@@ -69,6 +70,8 @@ Integritas history is evidence. A security limit should not decide their product
   limits repetition only; destinations and amounts remain trusted workflow configuration.
 
 **Retention by record purpose**
+
+- Standalone numeric change conditions keep per-block baselines in SQLite, independent of expiring run history. The first finite numeric sample passes; subsequent samples compare absolute difference to the last successful, non-stopped workflow baseline. Pending values commit with run success, never on an output failure or later stopped condition. This makes small changes accumulate and allows a failed display update to be retried. Condition identity edits reset the baseline; unrelated saves preserve it, and duplication starts fresh. Exact configuration matching prevents an in-flight run from overwriting an edited condition's state. Baselines are not a guarantee of exactly-once external effects: a write can succeed before a later failure.
 
 | Record | Policy |
 | --- | --- |
@@ -108,8 +111,8 @@ Integritas history is evidence. A security limit should not decide their product
 - **Budget of 10 runs per hour** (first version). Not derived from usage; ordinary event-driven
   workflows hit it within an hour. 1,000 is an interim ceiling until usage data supports a measured
   value.
-- **Configurable or per-block-type budgets.** Configuration could weaken a security boundary; no
-  usage data shows where per-type limits should sit.
+- **Configurable budgets or raising every workflow to 5,000/hour.** Configuration could weaken a security boundary. The local display use case warrants a narrowly classified fixed exception, not higher payment or external-action budgets.
+- **Compare with the previous sample, or retain change state only in memory/history.** Consecutive small changes could never pass the threshold; restarts or history retention would unexpectedly reset the baseline. Advancing it before downstream success could suppress retry after an output failure.
 - **A counter with `window_started_at`.** A fixed window allows boundary bursts.
 - **Cooldown or HTTP rate limiting only.** Process-local, and can't cover MQTT or GPIO.
 - **Budget only `send_transaction`.** Outputs, camera, and stamping have physical, privacy, storage,
@@ -128,6 +131,7 @@ Integritas history is evidence. A security limit should not decide their product
 - A leaked webhook token or hostile MQTT publisher can still cause up to 1,000 payments, outputs,
   captures, or stamps per hour per workflow. Webhook and manual-run limiters allow more than that,
   so the budget is the binding limit.
+- Display-only workflows can perform up to 5,000 privileged runs/hour. Approximate one-second scheduling can still record 86,400 reads/runs daily even if change filtering suppresses all output; retention remains opt-in, and this ceiling is not a measured hardware capacity.
 - Failed runs consume budget, which can briefly block after operational failures.
 - Storage still grows without bound while cleanup is off, and protected evidence/files are not bounded by this policy. Disk warnings are informational, not an automatic deletion trigger. Manual category/date cleanup and Dashboard warnings remain follow-ups.
 - Pre-fix Docker logs may still contain webhook tokens until they rotate or are removed.
@@ -136,6 +140,7 @@ Integritas history is evidence. A security limit should not decide their product
 
 ## History
 
+- 2026-11-20: Added the fixed display-only 5,000/hour exception, edit-safe policy rechecks and successful-completion numeric change baselines independent of retained history.
 - 2026-11-03: Replaced capture-time environment pruning with confirmed camera policy, optional-extension pause/resume and proof-media protection (camera portion of #861); generated-download cleanup and Dashboard warnings remain separate.
 - 2026-11-03: Added independent opt-in inbox age expiry, preview counts and active-run/file protection; retained keep-until-deleted defaults and the shared inbox batch limit.
 - 2026-11-03: Added opt-in SQLite retention settings, reviewed previews, per-workflow/age cleanup, evidence protection and Settings disk warnings (#856/#857 and the automatic-retention part of #819).

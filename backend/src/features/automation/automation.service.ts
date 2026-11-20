@@ -1,4 +1,6 @@
 import fs from "node:fs/promises";
+import { db } from "../../db/database.js";
+import { conditionBaselineKey, evaluateNumericChange, type PendingConditionBaseline } from "./automationConditions.js";
 import {
   getDataSource,
   updateDataSourceReadResult,
@@ -48,6 +50,8 @@ import {
   getAutomationWorkflow,
   listAutomationBlocks,
   listDueScheduleWorkflows,
+  getConditionBaseline,
+  saveConditionBaselines,
   updateAutomationBlockRun,
   updateAutomationWorkflow,
   updateAutomationRunError,
@@ -73,8 +77,8 @@ import {
   isEventStartBlock,
   isPrivilegedAutomationBlock,
   isValidTransactionCooldown,
-  WORKFLOW_RUN_BUDGET_MAX_RUNS,
   WORKFLOW_RUN_BUDGET_WINDOW_MS,
+  workflowRunBudgetLimit,
 } from "./automation.policy.js";
 import { validateAutomationWorkflow } from "./automation.validation.js";
 
@@ -106,6 +110,8 @@ type WorkflowContext = {
   output?: unknown;
   stopped?: boolean;
   budgetReserved?: boolean;
+  budgetLimit: number;
+  pendingBaselines: PendingConditionBaseline[];
   variables: Record<string, unknown>;
 };
 
@@ -128,7 +134,7 @@ type WorkflowCondition = {
   source?: "trigger" | "variable";
   fieldPath?: string;
   variableName?: string;
-  operator?: FieldCondition["operator"];
+  operator?: FieldCondition["operator"] | "changed_by_at_least";
   value?: unknown;
 };
 
@@ -146,6 +152,7 @@ type PreviewContentMode = "custom" | "workflow_context" | "trigger_payload" | "l
 type PreviewImageSource = "url" | "local_path";
 
 const runningWorkflowIds = new Set<string>();
+const scheduledWorkflowIds = new Set<string>();
 const eventWorkflowLastAcceptedAt = new Map<string, number>();
 let scheduler: NodeJS.Timeout | null = null;
 
@@ -269,7 +276,7 @@ export async function executeWorkflow(
   markEventWorkflowAccepted(latestWorkflow.id, mainBlocks[0], trigger);
 
   runningWorkflowIds.add(latestWorkflow.id);
-  const context: WorkflowContext = { trigger, variables: {} };
+  const context: WorkflowContext = { trigger, variables: {}, pendingBaselines: [], budgetLimit: workflowRunBudgetLimit(blocks, (id) => getDataSource(id)?.type) };
   let nextRunAt: string | null = latestWorkflow.next_run_at;
   let run = null as ReturnType<typeof createAutomationRun> | null;
 
@@ -293,12 +300,16 @@ export async function executeWorkflow(
       if (context.stopped) break;
     }
 
-    const updatedWorkflow = updateAutomationRunSuccess(latestWorkflow.id, {
-      hash: context.hash ?? null,
-      proofId: context.proofId ?? null,
-      nextRunAt,
-    });
-    finishAutomationRun(run.id, { status: "success" });
+    const updatedWorkflow = db.transaction(() => {
+      if (!context.stopped) saveConditionBaselines(latestWorkflow.id, context.pendingBaselines);
+      const updated = updateAutomationRunSuccess(latestWorkflow.id, {
+        hash: context.hash ?? null,
+        proofId: context.proofId ?? null,
+        nextRunAt,
+      });
+      finishAutomationRun(run!.id, { status: "success" });
+      return updated;
+    })();
     return {
       workflow: serializeAutomationWorkflow(updatedWorkflow),
       dataSource: context.data?.sourceId
@@ -375,18 +386,18 @@ function enforceTransactionCooldown(
   );
 }
 
-function reserveRunBudget(workflowId: string, runId: string) {
+function reserveRunBudget(workflowId: string, runId: string, maxRuns: number) {
   const reservation = reserveWorkflowRunBudget({
     workflowId,
     runId,
     nowMs: Date.now(),
-    maxRuns: WORKFLOW_RUN_BUDGET_MAX_RUNS,
+    maxRuns,
     windowMs: WORKFLOW_RUN_BUDGET_WINDOW_MS,
   });
   if (reservation.ok) return;
   throw Object.assign(
     new Error(
-      `Workflow run budget exhausted (${WORKFLOW_RUN_BUDGET_MAX_RUNS} runs with device, camera, stamp, or payment actions per hour); next run allowed after ${reservation.nextAvailableAt}`,
+      `Workflow run budget exhausted (${maxRuns} runs with device, camera, stamp, or payment actions per hour); next run allowed after ${reservation.nextAvailableAt}`,
     ),
     { code: "WORKFLOW_RUN_BUDGET_EXHAUSTED", nextAvailableAt: reservation.nextAvailableAt },
   );
@@ -470,7 +481,7 @@ async function executeBlock(
     valueJsonText?: string;
     source?: "trigger" | "variable";
     fieldPath?: string;
-    operator?: FieldCondition["operator"];
+    operator?: WorkflowCondition["operator"];
     value?: unknown;
     condition?: FieldCondition | null;
     recipientAddressBookId?: string;
@@ -499,16 +510,21 @@ async function executeBlock(
       finishAutomationBlockRun(blockRun.id, { status: "success", output: contextSummary(context) });
       return;
     }
-    if (isPrivilegedAutomationBlock(block.type) && !context.budgetReserved) {
-      reserveRunBudget(workflow.id, runId);
-      context.budgetReserved = true;
+    if (isPrivilegedAutomationBlock(block.type)) {
+      const limit = Math.min(context.budgetLimit, workflowRunBudgetLimit(listAutomationBlocks(workflow.id).filter((item) => item.enabled), (id) => getDataSource(id)?.type));
+      if (context.budgetReserved && limit < context.budgetLimit) throw new Error("Workflow action policy changed during the run; retry with the updated configuration");
+      if (!context.budgetReserved) {
+        reserveRunBudget(workflow.id, runId, limit);
+        context.budgetLimit = limit;
+        context.budgetReserved = true;
+      }
     }
     if (block.type === "record_trigger_event") await recordTriggerEvent(workflow, block, context);
     else if (block.type === "fetch_data_source")
       await fetchDataSource(workflow, block, context, String(config.sourceId ?? ""));
     else if (block.type === "capture_camera") await captureCamera(workflow, block, context, config);
     else if (block.type === "set_variable") setVariable(config, context);
-    else if (block.type === "if_payload_field_equals") checkPayloadFieldEquals(config, context);
+    else if (block.type === "if_payload_field_equals") checkPayloadFieldEquals(workflow, block, config, context);
     else if (block.type === "wait") await wait(Number(config.durationMs ?? 0));
     else if (block.type === "show_preview") showPreview(workflow, block, runId, config, context);
     else if (block.type === "stamp_integritas")
@@ -963,19 +979,23 @@ function blockLabel(type: string) {
   return "Start workflow";
 }
 
-function checkPayloadFieldEquals(config: WorkflowCondition, context: WorkflowContext) {
-  const result = evaluateWorkflowCondition(context, config);
+function checkPayloadFieldEquals(workflow: AutomationWorkflowRecord, block: AutomationBlockRecord, config: WorkflowCondition, context: WorkflowContext) {
+  const key = conditionBaselineKey(config);
+  const previous = config.operator === "changed_by_at_least" ? getConditionBaseline(workflow.id, block.id, key) : null;
+  const result = evaluateWorkflowCondition(context, config, previous);
+  if (config.operator === "changed_by_at_least" && result.matched) context.pendingBaselines.push({ blockId: block.id, configJson: block.config_json, key, value: result.actual as number });
   context.output = { ...result, action: result.matched ? "continued" : "stopped" };
   if (!result.matched) context.stopped = true;
 }
 
-function evaluateWorkflowCondition(context: WorkflowContext, condition: WorkflowCondition) {
+function evaluateWorkflowCondition(context: WorkflowContext, condition: WorkflowCondition, previous: number | null) {
   const source = condition.source ?? "trigger";
   const actual =
     source === "variable"
       ? context.variables[String(condition.variableName ?? "")]
       : getPathValue(context.trigger.payload, String(condition.fieldPath ?? ""));
-  const matched = evaluateOperator(actual, condition.operator!, condition.value);
+  const change = condition.operator === "changed_by_at_least" ? evaluateNumericChange(actual, condition.value, previous) : null;
+  const matched = condition.operator === "changed_by_at_least" ? change!.matched : evaluateOperator(actual, condition.operator!, condition.value);
   return {
     source,
     fieldPath: condition.fieldPath,
@@ -984,6 +1004,7 @@ function evaluateWorkflowCondition(context: WorkflowContext, condition: Workflow
     expected: condition.value,
     actual,
     matched,
+    ...(change ?? {}),
   };
 }
 
@@ -991,6 +1012,7 @@ function evaluateCondition(
   context: WorkflowContext,
   condition: FieldCondition & { source: "trigger" | "data" },
 ) {
+  if ((condition.operator as string) === "changed_by_at_least") throw new Error("Changed by at least requires a standalone If field matches block");
   const source =
     condition.source === "data" ? context.data?.result.preview : context.trigger.payload;
   const actual = getPathValue(source, condition.fieldPath);
@@ -1432,9 +1454,10 @@ export function startAutomationScheduler() {
   if (scheduler) return;
   scheduler = setInterval(() => {
     const due = listDueScheduleWorkflows(new Date().toISOString()).filter(
-      (workflow) => !runningWorkflowIds.has(workflow.id),
+      (workflow) => !runningWorkflowIds.has(workflow.id) && !scheduledWorkflowIds.has(workflow.id),
     );
     for (const workflow of due) {
+      scheduledWorkflowIds.add(workflow.id);
       validateAutomationWorkflow(workflow.id)
         .then((validation) => {
           if (!validation.ok) {
@@ -1446,7 +1469,8 @@ export function startAutomationScheduler() {
         })
         .catch((error: Error) =>
           console.error(`Automation workflow ${workflow.id} failed: ${error.message}`),
-        );
+        )
+        .finally(() => scheduledWorkflowIds.delete(workflow.id));
     }
   }, 1000);
 }

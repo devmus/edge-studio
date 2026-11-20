@@ -8,8 +8,24 @@ import {
   WORKFLOW_RUN_BUDGET_MAX_RUNS,
   WORKFLOW_RUN_BUDGET_WINDOW_MS
 } from "../../../src/features/automation/automation.policy.js";
+import { DISPLAY_WORKFLOW_RUN_BUDGET_MAX_RUNS, workflowRunBudgetLimit } from "../../../src/features/automation/automation.policy.js";
 
 describe("automation.policy", () => {
+  it("grants 5000 only to enabled display-only side effects and retains 1000 for mixed or unknown targets", () => {
+    const display = { type: "control_output" as const, config_json: '{"targetId":"screen","action":"display_text"}' };
+    const targetType = (id: string) => id === "screen" ? "spi-display" : undefined;
+    assert.equal(DISPLAY_WORKFLOW_RUN_BUDGET_MAX_RUNS, 5000);
+    assert.equal(workflowRunBudgetLimit([display, { type: "fetch_data_source", config_json: '{}' }], targetType), 5000);
+    for (const type of ["send_transaction", "capture_camera", "stamp_integritas"] as const) {
+      assert.equal(workflowRunBudgetLimit([display, { type, config_json: '{}' }], targetType), 1000);
+      assert.equal(workflowRunBudgetLimit([display, { type, config_json: '{}', enabled: 0 }], targetType), 5000);
+    }
+    assert.equal(workflowRunBudgetLimit([display], () => "http-output"), 1000);
+    assert.equal(workflowRunBudgetLimit([display], () => undefined), 1000);
+    assert.equal(workflowRunBudgetLimit([{ ...display, config_json: 'invalid' }], targetType), 1000);
+    assert.equal(workflowRunBudgetLimit([{ ...display, config_json: '{"targetId":"screen","action":"pulse"}' }], targetType), 1000);
+    assert.equal(workflowRunBudgetLimit([], targetType), 1000);
+  });
   it("fixes the workflow run budget at 1000 runs per rolling hour", () => {
     assert.equal(WORKFLOW_RUN_BUDGET_MAX_RUNS, 1000);
     assert.equal(WORKFLOW_RUN_BUDGET_WINDOW_MS, 60 * 60 * 1000);

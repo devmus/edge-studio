@@ -42,6 +42,7 @@ type ValidationBlock = {
 };
 
 export type BlockConfig = {
+  intervalSeconds?: number;
   sourceId?: string;
   targetId?: string;
   action?: string;
@@ -59,7 +60,7 @@ export type BlockConfig = {
   fieldPath?: string;
   operator?: string;
   value?: unknown;
-  condition?: { source?: "trigger" | "data" } | null;
+  condition?: { source?: "trigger" | "data"; operator?: string } | null;
   recipientAddressBookId?: string;
   tokenId?: string;
   amount?: string;
@@ -140,6 +141,9 @@ async function validateAutomationBlockGraph(blocks: ValidationBlock[]): Promise<
     const config = block.config;
 
     validateBlockReference(block, config, issues, hardwareCapabilities);
+    if (block.type === "schedule_start" && (typeof config.intervalSeconds !== "number" || !Number.isFinite(config.intervalSeconds) || config.intervalSeconds < 1)) {
+      addIssue(issues, "error", "schedule.invalid_interval", "Schedule interval must be a finite number of at least 1 second.", block);
+    }
     if (block.type === "gpio_event_start" || block.type === "webhook_event_start" || block.type === "mqtt_event_start") validateEventStartConfig(block, config, issues);
 
     if (block.type === "record_trigger_event") {
@@ -174,6 +178,9 @@ async function validateAutomationBlockGraph(blocks: ValidationBlock[]): Promise<
 
     for (const attachedBlock of blocks.filter((item) => item.enabled && item.parentId === block.id)) {
       const attachedConfig = attachedBlock.config;
+      if (attachedConfig.condition?.operator === "changed_by_at_least") {
+        addIssue(issues, "error", "stamp_integritas.unsupported_change_condition", "Changed by at least requires a standalone If field matches block.", attachedBlock);
+      }
       if (attachedBlock.type !== "stamp_integritas") {
         addIssue(issues, "error", "attached.unsupported", "Only Integritas stamp blocks can be attached to another block.", attachedBlock);
         continue;
@@ -388,6 +395,7 @@ function validateWorkflowConditionBlock(block: ValidationBlock, config: BlockCon
   }
   if (!isConditionOperator(String(config.operator ?? ""))) addIssue(issues, "error", "condition.invalid_operator", "Condition requires a valid operator.", block);
   if (config.operator !== "exists" && config.operator !== "does_not_exist" && !Object.prototype.hasOwnProperty.call(config, "value")) addIssue(issues, "error", "condition.missing_value", "Condition requires a compare value.", block);
+  if (config.operator === "changed_by_at_least" && (typeof config.value !== "number" || !Number.isFinite(config.value) || config.value <= 0)) addIssue(issues, "error", "condition.invalid_change_threshold", "Change threshold must be a finite number greater than zero.", block);
 }
 
 function validateShowPreviewBlock(block: ValidationBlock, config: BlockConfig, hasData: boolean, issues: AutomationValidationIssue[]) {
@@ -451,6 +459,7 @@ function isPositiveDecimal(value: string) {
 
 function isConditionOperator(value: string) {
   return value === "equals"
+    || value === "changed_by_at_least"
     || value === "not_equals"
     || value === "greater_than"
     || value === "greater_than_or_equals"

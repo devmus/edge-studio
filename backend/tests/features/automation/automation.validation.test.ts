@@ -107,6 +107,33 @@ function expectWarning(result: { warnings: { code: string }[] }, code: string) {
 }
 
 describe("validateAutomationDraft — workflow shape", () => {
+  it("accepts one-second scheduling and rejects invalid intervals", async () => {
+    for (const intervalSeconds of [1, 10, 60]) {
+      const result = await validation.validateAutomationDraft([block({ clientId: "start", type: "schedule_start", config: { intervalSeconds } })]);
+      assert.equal(result.ok, true);
+    }
+    for (const intervalSeconds of [undefined, 0, -1, 0.5, Infinity, NaN, "1"]) {
+      const result = await validation.validateAutomationDraft([block({ clientId: "start", type: "schedule_start", config: { intervalSeconds } as DraftBlock["config"] })]);
+      expectError(result, "schedule.invalid_interval");
+    }
+  });
+
+  it("accepts numeric change conditions and rejects invalid thresholds", async () => {
+    for (const value of [1, 0.1, 100]) {
+      const result = await validation.validateAutomationDraft([manualStart(), block({ clientId: "condition", type: "if_payload_field_equals", config: { source: "trigger", fieldPath: "lux", operator: "changed_by_at_least", value } })]);
+      assert.equal(result.ok, true);
+    }
+    for (const value of [undefined, null, 0, -1, Infinity, NaN, "1", true]) {
+      const result = await validation.validateAutomationDraft([manualStart(), block({ clientId: "condition", type: "if_payload_field_equals", config: { source: "trigger", fieldPath: "lux", operator: "changed_by_at_least", value } })]);
+      expectError(result, "condition.invalid_change_threshold");
+    }
+  });
+
+  it("rejects change conditions attached directly to stamps", async () => {
+    const result = await validation.validateAutomationDraft([manualStart(), block({ clientId: "fetch", type: "fetch_data_source" }), block({ clientId: "stamp", type: "stamp_integritas", parentBlockId: "fetch", config: { condition: { source: "data", operator: "changed_by_at_least" } } })]);
+    expectError(result, "stamp_integritas.unsupported_change_condition");
+  });
+
   it("errors when there are no blocks", async () => {
     const result = await validation.validateAutomationDraft([]);
     expectError(result, "workflow.no_blocks");

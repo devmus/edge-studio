@@ -72,7 +72,7 @@ These are the current toolkit names. Some older guides call **Control device** â
 | Category | Block | Purpose | Compatible inputs / requirements |
 | --- | --- | --- | --- |
 | Start | Manual run | Start when an operator runs the workflow | No event device required |
-| Start | Schedule | Start repeatedly at a configured interval | Workflow enabled for scheduled execution |
+| Start | Schedule | Start repeatedly at a configured interval, from 1 second | Approximate polling; workflow enabled; running jobs do not overlap themselves |
 | Start | GPIO input event | Start on a pin event | GPIO Input Pin, GPIO Button or PIR Motion Sensor; enabled GPIO and workflow |
 | Start | Webhook received | Start when JSON arrives | Configured Webhook Receiver and enabled workflow |
 | Start | MQTT message received | Start on a broker message | MQTT Subscriber or ESP32 MQTT Board and enabled workflow |
@@ -80,7 +80,7 @@ These are the current toolkit names. Some older guides call **Control device** â
 | Data | Fetch data source | Read, store and hash current JSON | HTTP JSON Source, BME280, BME680, BH1750 or Device System Data |
 | Data | Capture camera | Capture media and record its hash/metadata | Configured Raspberry Pi Camera and enabled camera capability |
 | Data | Set variable | Save a value for later blocks in this run | Custom JSON, trigger fields, latest data or context; variables do not persist between runs |
-| Logic | If field matches | Continue only when a comparison passes | Trigger field or previously set variable; stops later blocks on a failed comparison, not an arbitrary branching/else graph |
+| Logic | If field matches | Continue only when a comparison passes, including numeric **changed by at least** | Trigger field or previously set variable; change baseline persists until successful completion and resets on condition edits; stops later blocks on failure; see the [lux-to-display example](./pim576-display.md#update-only-after-a-lux-change) |
 | Logic | Wait | Delay the next block | Configured duration; does not add automatic retry logic |
 | Action | Show preview | Create a local Workflow Inbox item | Text, JSON, links or image references from configured content/context; not an external notification service |
 | Action | Control device | Send an output command | GPIO LED, HTTP JSON Target, MQTT Publisher or PIM576 SPI LCD; actual effect depends on target/action |

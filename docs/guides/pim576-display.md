@@ -82,6 +82,24 @@ Review the workflow and run manually. Change the custom variable, save and run a
 
 `text` must be a nonempty string of up to 512 characters. `title` is optional, a single line of up to 32 characters. These validation limits do not promise the content fits the panel. Text wraps within 216 pixels; an over-wide title or too many wrapped lines is rejected before a write, preserving the previous frame. The fixed Pillow font determines supported glyphs. Use short plain text for the first test. A variable that resolves to a number/object instead of a string is rejected; set a string variable or build a string around the value.
 
+## Update only after a lux change
+
+With a configured BH1750 sensor and PIM576 screen, build this disabled workflow and test it manually before enabling its schedule:
+
+1. **Schedule** → **Every 1 second**. This is approximate backend polling, not a hardware interrupt; slow runs do not overlap themselves.
+2. **Fetch data source** → your BH1750.
+3. **Set variable** → name `lux`, source **Latest data field**, field path `lux`.
+4. **If field matches** → source **Variable**, name `lux`, operator **changed by at least**, **Minimum change** `1`.
+5. **Control device** → your PIM576, Display JSON `{"title":"Light level","text":"Lux: {{lux}}"}`. Keep the prefix: an exact `"{{lux}}"` resolves to a number and is rejected by the string-only display boundary.
+
+The first finite numeric reading passes. Later readings pass when their absolute difference from the last successful workflow baseline reaches the positive numeric threshold, up or down. For example, after displaying 10 lux, 10.4 and 10.8 are filtered out; 11 passes. BH1750 readings currently have approximately 0.83-lux resolution; start with a 1-lux threshold rather than 0.1.
+
+Each condition stores its baseline in SQLite, separately from run history. It survives restarts and pause/re-enable. It advances only when the entire workflow succeeds without a later condition stopping it; output errors keep the old baseline for a later attempt. Editing the condition's source, field/variable, operator or threshold resets it. Unrelated saves preserve it, and a duplicated condition/workflow starts fresh. This operator is available only on the standalone condition, not directly on an attached stamp.
+
+Workflows whose enabled privileged actions are all SPI display text outputs have a fixed budget of **5,000 runs per rolling hour**. Reads, variables and logic do not disqualify them. Adding a payment, camera, stamp or another kind of output keeps the existing **1,000/hour** limit. The same persisted ledger is retained across edits; filtered runs that stop before any privileged action consume no slot, while a failed output consumes one.
+
+Filtering avoids display writes, not sensor reads or run records. One-second polling can create **86,400 reads and runs per day**. Review **Settings → Storage & history** retention; automatic cleanup remains off until explicitly enabled. Physical timing, repeated updates and failure/recovery for this workflow still require Pi verification.
+
 ## Failure and privacy behaviour
 
 - Disabled/missing support, malformed JSON, invalid rotation, missing text and GPIO ownership conflicts produce actionable validation or runtime errors.
