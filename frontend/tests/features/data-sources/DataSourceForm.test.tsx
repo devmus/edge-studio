@@ -185,6 +185,18 @@ describe("DataSourceForm", () => {
     expect(screen.getByLabelText("I2C address")).toBeInTheDocument();
   });
 
+  it("edits a saved BH1750 with only BH1750 addresses and validates the bus", async () => {
+    const formFields = fields({ type: "bh1750-sensor", bmeBus: "1", bmeAddress: "0x5c" });
+    render(<DataSourceForm template={null} {...formFields} />);
+    expect(screen.getByLabelText("I2C address")).toHaveValue("0x5c");
+    expect(screen.queryByRole("option", { name: "0x76" })).not.toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByLabelText("I2C address"), "0x23");
+    expect(formFields.setBmeAddress).toHaveBeenCalledWith("0x23");
+    expect(isDataSourceFormValid(formFields)).toBe(true);
+    expect(isDataSourceFormValid({ ...formFields, bmeBus: "1.5" })).toBe(false);
+    expect(isDataSourceFormValid({ ...formFields, bmeAddress: "0x76" })).toBe(false);
+  });
+
   it("shows the device-system-data description with no configurable fields", () => {
     render(<DataSourceForm template={null} {...fields({ type: "device-system-data" })} />);
     expect(screen.getByText(/reads local OS facts from this Pi/)).toBeInTheDocument();

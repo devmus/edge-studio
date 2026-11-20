@@ -58,6 +58,7 @@
 
 ### Devices and automation
 
+- [ ] Finish BH1750 maintainer review in draft PR [#193](https://github.com/edge-studio-technology/edge-studio/pull/193) and confirm CI for its latest evidence commit. The contributor personally confirmed MIT rights and reported completion of the physical checklist; the saved screenshot, Pi 4 Model B Rev 1.4/Debian 13.6/aarch64 setup, matching tested commit and evidence limits are in [BH1750 verification status](./guides/bh1750-sensor.md#verification-status). Linux CI passed at integration commit 4058467; no merge or release is implied.
 - [ ] PIR motion sensor: verify a PIR on the Pi through the UI and a `gpio_event_start` workflow, add beginner templates (motion → record, camera capture, stamp), and document defaults that change during hardware testing.
 - [ ] ESP32 MQTT boards: verify an ESP32 publishing JSON to the Pi broker is recorded by an MQTT workflow; add DHT22 (after hardware verification), button, analog, and PIR-over-MQTT templates; add first-message troubleshooting; document broker auth limitations.
 - [ ] Workflow templates for common GPIO, HTTP, webhook, schedule, output, MQTT, and Integritas flows.
@@ -77,6 +78,8 @@
 
 ## Done
 
+- [x] Recorded contributor-reported BH1750 physical success on Raspberry Pi 4 Model B Rev 1.4, Debian 13.6 (trixie)/aarch64 at implementation commit `e8fbe5329a218f5d9d43354a534f1bbf57d9a95d`, with a supplied 12.5-lux workflow preview at bus 1/address 0x23. Updated scoped evidence in the guide/catalog; individual test-case results and Linux CI remain separate.
+- [x] Implemented BH1750 lux reads through the existing I2C helper, backend/API/workflows, device setup/editing and in-app/operator guides. Full application coverage suites, lint/docs/Knip/typechecks, builds, application audits, Compose configuration and 37 Python tests passed; full check retains Windows root-script failures and Docker image build is blocked by the unavailable Linux daemon. Physical verification and publication remain separate follow-ups.
 - [x] Clarified AI-assisted PR handoff: contributors confirm their own MIT submission rights, relevant evidence belongs on the PR, and missing required items stay visible as draft follow-up. Updated contributor/review docs and mirrored skills; see SESSION for verification.
 
 - [x] Fixed piped uninstall confirmation by opening terminal input/output separately; real Linux pseudo-terminal reproduction, all 16 Linux uninstall regressions, Windows scripts wrapper, shell syntax and lint/docs checks passed. Typed deletion confirmation and missing-terminal refusal remain enforced; physical disposable-Pi uninstall validation remains open.

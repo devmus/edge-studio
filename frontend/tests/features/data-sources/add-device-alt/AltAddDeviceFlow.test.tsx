@@ -85,6 +85,45 @@ describe("AltAddDeviceFlow", () => {
     expect(screen.getByRole("button", { name: "Open device guide" })).toBeInTheDocument();
   });
 
+  it("adds a BH1750 through setup, validation, review and create with the selected address", async () => {
+    const created = { id: "light", name: "BH1750 Light Sensor", type: "bh1750-sensor" };
+    createDataSource.mockResolvedValue({ item: created });
+    const { props } = renderFlow({ capabilities: { gpioInput: { available: false, devicePath: "", reason: null }, sensors: { enabled: true, available: true, reason: null, supportedSensors: ["bh1750"] } } });
+    await userEvent.click(screen.getByRole("button", { name: /Sensors/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Template devices/ }));
+    await userEvent.click(screen.getByRole("button", { name: /BH1750 Light Sensor/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Next step (2)" }));
+    await userEvent.click(screen.getByRole("button", { name: "Next step (3)" }));
+    expect(screen.getByLabelText("I2C address")).toHaveValue("0x23");
+    expect(screen.queryByLabelText("Sensor model")).not.toBeInTheDocument();
+    await userEvent.clear(screen.getByLabelText("I2C bus"));
+    await userEvent.type(screen.getByLabelText("I2C bus"), "11");
+    expect(screen.getByRole("button", { name: "Next step (4)" })).toBeDisabled();
+    expect(screen.getByLabelText("I2C bus")).toHaveAttribute("aria-invalid", "true");
+    await userEvent.clear(screen.getByLabelText("I2C bus"));
+    await userEvent.type(screen.getByLabelText("I2C bus"), "1");
+    await userEvent.selectOptions(screen.getByLabelText("I2C address"), "0x5c");
+    await userEvent.click(screen.getByRole("button", { name: "Next step (4)" }));
+    expect(screen.getByText("BH1750 (lux)")).toBeInTheDocument();
+    expect(screen.getByText("0x5c")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Add device" }));
+    await waitFor(() => expect(props.onCreated).toHaveBeenCalledWith(created));
+    expect(createDataSource).toHaveBeenCalledWith(expect.objectContaining({ type: "bh1750-sensor", config: { sensor: "bh1750", bus: 1, address: "0x5c" } }));
+  });
+
+  it("shows BH1750 prerequisites when sensors are disabled and a repair warning for an older helper", async () => {
+    const { rerender } = renderFlow();
+    await userEvent.click(screen.getByRole("button", { name: /Sensors/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Template devices/ }));
+    expect(screen.queryByRole("button", { name: /BH1750 Light Sensor/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/Enable I2C sensors in Devices/)).toBeInTheDocument();
+    rerender(<ToastProvider><AltAddDeviceFlow open capabilities={{ gpioInput: { available: false, devicePath: "", reason: null }, sensors: { enabled: true, available: true, reason: null, supportedSensors: ["bme280"] } }} onClose={vi.fn()} onCreated={vi.fn()} /></ToastProvider>);
+    await userEvent.click(screen.getByRole("button", { name: /Sensors/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Template devices/ }));
+    await userEvent.click(screen.getByRole("button", { name: /BH1750 Light Sensor/ }));
+    expect(screen.getByText("BH1750 helper support is missing")).toBeInTheDocument();
+  });
+
   it("validates video capture settings and saves the selected mode and timing", async () => {
     createDataSource.mockResolvedValue({ item: { id: "video-1", name: "Raspberry Pi Camera" } });
     renderFlow();

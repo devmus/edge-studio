@@ -10,6 +10,7 @@ import { publishMqttOutput } from "../data-sources/mqttOutput.service.js";
 import { capturePiCamera } from "../data-sources/cameraCapture.service.js";
 import {
   parseBmeSensorConfig,
+  parseBh1750SensorConfig,
   parseDeviceSystemDataConfig,
   parseHttpOutputConfig,
   parseJsonApiConfig,
@@ -19,7 +20,7 @@ import {
   sendMultipartMediaOutput,
   serializeDataSource,
 } from "../data-sources/dataSources.service.js";
-import { readBmeSensorSource } from "../data-sources/sensorHelper.service.js";
+import { readBh1750SensorSource, readBmeSensorSource } from "../data-sources/sensorHelper.service.js";
 import {
   createDataSourceRead,
   dataSourceReference,
@@ -616,6 +617,8 @@ async function fetchDataSource(
     const result =
       source.type === "bme-sensor"
         ? await readBmeSensorSource(parseBmeSensorConfig(JSON.parse(source.config) as unknown))
+        : source.type === "bh1750-sensor"
+          ? await readBh1750SensorSource(parseBh1750SensorConfig(JSON.parse(source.config) as unknown))
         : source.type === "device-system-data"
           ? await readDeviceSystemDataSource(parseDeviceSystemDataConfig(JSON.parse(source.config) as unknown))
         : await readJsonApiSource(parseJsonApiConfig(JSON.parse(source.config) as unknown));
@@ -934,6 +937,7 @@ function nextScheduleRunAt(block: AutomationBlockRecord, previousNextRunAt: stri
 function sourceUrlForRecord(source: { type: string; config: string }) {
   const config = JSON.parse(source.config) as Record<string, unknown>;
   if (source.type === "pi-camera") return `pi-camera:${config.mode ?? "photo"}`;
+  if (source.type === "bh1750-sensor") return `bh1750:i2c-${config.bus ?? 1}:${config.address ?? "0x23"}`;
   if (source.type === "bme-sensor")
     return `${config.sensor ?? "bme280"}:i2c-${config.bus ?? 1}:${config.address ?? "0x76"}`;
   if (source.type === "device-system-data") return "device-system-data:local";
@@ -941,7 +945,7 @@ function sourceUrlForRecord(source: { type: string; config: string }) {
 }
 
 function isReadableDataSource(type: string) {
-  return type === "json-api" || type === "bme-sensor" || type === "device-system-data";
+  return type === "json-api" || type === "bme-sensor" || type === "bh1750-sensor" || type === "device-system-data";
 }
 
 function blockLabel(type: string) {

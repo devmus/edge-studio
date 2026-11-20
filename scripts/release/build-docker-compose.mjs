@@ -291,7 +291,7 @@ HOST_AGENT_TOKEN=
 HOST_AGENT_PORT=38182
 HOST_CAPABILITY_DEBUG=false
 
-# Optional: Environmental sensor support (BME280/BME680)
+# Optional: I2C sensor support (BME280/BME680 environmental, BH1750 light)
 ENABLE_SENSORS=false
 SENSOR_HELPER_URL=http://host.docker.internal:38181
 SENSOR_HELPER_TOKEN=

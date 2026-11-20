@@ -86,6 +86,8 @@ export function buildDeviceConfigInput(
       bus: Number(bmeBus),
       address: bmeAddress,
     };
+  if (type === "bh1750-sensor")
+    return { sensor: "bh1750" as const, bus: Number(bmeBus), address: bmeAddress };
   if (type === "device-system-data")
     return {
       includeSpecs: true,

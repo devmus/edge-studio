@@ -389,6 +389,26 @@ describe("validateAutomationDraft — block references", () => {
 });
 
 describe("validateAutomationDraft — hardware dependencies", () => {
+  it.each([
+    [{ enabled: false, available: false }, "sensors.disabled"],
+    [{ enabled: true, available: true, supportedSensors: ["bme280"] }, "sensors.unsupported_model"],
+    [{ enabled: true, available: true }, "sensors.unsupported_model"],
+  ])("rejects a BH1750 workflow without the necessary helper support: %j", async (capability, code) => {
+    getDataSourceMock.mockReturnValue({ id: "light", type: "bh1750-sensor", config: '{}' });
+    getSensorHelperCapabilityMock.mockResolvedValue(capability);
+    const result = await validation.validateAutomationDraft([manualStart(), block({ clientId: "read", type: "fetch_data_source", config: { sourceId: "light" } })]);
+    expectError(result, code as string);
+  });
+
+  it("accepts BH1750 as a readable source and warns when its helper is unavailable", async () => {
+    getDataSourceMock.mockReturnValue({ id: "light", type: "bh1750-sensor", config: '{}' });
+    getSensorHelperCapabilityMock.mockResolvedValue({ enabled: true, available: true, supportedSensors: ["bh1750"] });
+    const blocks = [manualStart(), block({ clientId: "read", type: "fetch_data_source", config: { sourceId: "light" } })];
+    assert.equal((await validation.validateAutomationDraft(blocks)).errors.length, 0);
+    getSensorHelperCapabilityMock.mockResolvedValue({ enabled: true, available: false });
+    assert.ok((await validation.validateAutomationDraft(blocks)).warnings.some((warning) => warning.code === "sensors.unavailable"));
+  });
+
   it("errors when a GPIO start source depends on disabled GPIO support", async () => {
     getDataSourceMock.mockReturnValue({ id: "gpio1", type: "gpio-input", config: "{}" });
     getGpioInputCapabilityMock.mockReturnValue({ enabled: false, available: false, reason: "GPIO support is disabled." });

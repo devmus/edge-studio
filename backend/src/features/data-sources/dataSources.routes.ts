@@ -12,8 +12,8 @@ import { getGpioInputCapability, syncGpioDataSources } from "./gpioIngestion.ser
 import { pulseGpioOutput } from "./gpioOutput.service.js";
 import { publishMqttOutput } from "./mqttOutput.service.js";
 import { getCameraCapability } from "./cameraCapture.service.js";
-import { parseBmeSensorConfig, parseDataSourceConfig, parseDeviceSystemDataConfig, parseGpioInputConfig, parseGpioOutputConfig, parseHttpOutputConfig, parseJsonApiConfig, processWebhookPayload, readDeviceSystemDataSource, readJsonApiSource, sendHttpOutput, serializeDataSource } from "./dataSources.service.js";
-import { getSensorHelperCapability, readBmeSensorSource } from "./sensorHelper.service.js";
+import { parseBh1750SensorConfig, parseBmeSensorConfig, parseDataSourceConfig, parseDeviceSystemDataConfig, parseGpioInputConfig, parseGpioOutputConfig, parseHttpOutputConfig, parseJsonApiConfig, processWebhookPayload, readDeviceSystemDataSource, readJsonApiSource, sendHttpOutput, serializeDataSource } from "./dataSources.service.js";
+import { getSensorHelperCapability, readBh1750SensorSource, readBmeSensorSource } from "./sensorHelper.service.js";
 
 export const dataSourcesRouter = Router();
 export const dataSourcesWebhookRouter = Router();
@@ -65,7 +65,7 @@ dataSourcesRouter.post("/", requireRole("admin"), async (req, res) => {
   const description = typeof req.body?.description === "string" ? req.body.description : "";
 
   if (!name) return badRequest(res, "name is required", { field: "name" });
-  if (!isSupportedDeviceType(type)) return badRequest(res, "Only HTTP JSON API, webhook, MQTT, GPIO input/output, Pi Camera, BME sensor, Device System Data, HTTP output, and MQTT output devices are supported", { type });
+  if (!isSupportedDeviceType(type)) return badRequest(res, "Only HTTP JSON API, webhook, MQTT, GPIO input/output, Pi Camera, BME sensor, BH1750 sensor, Device System Data, HTTP output, and MQTT output devices are supported", { type });
 
   try {
     const config = parseDataSourceConfig(type, req.body?.config);
@@ -99,7 +99,7 @@ dataSourcesRouter.patch("/:id", requireRole("admin"), async (req, res) => {
   const description = typeof req.body?.description === "string" ? req.body.description : "";
 
   if (!name) return badRequest(res, "name is required", { field: "name" });
-  if (!isSupportedDeviceType(type)) return badRequest(res, "Only HTTP JSON API, webhook, MQTT, GPIO input/output, Pi Camera, BME sensor, Device System Data, HTTP output, and MQTT output devices are supported", { type });
+  if (!isSupportedDeviceType(type)) return badRequest(res, "Only HTTP JSON API, webhook, MQTT, GPIO input/output, Pi Camera, BME sensor, BH1750 sensor, Device System Data, HTTP output, and MQTT output devices are supported", { type });
 
   try {
     const config = parseDataSourceConfig(type, req.body?.config, JSON.parse(existing.config) as unknown);
@@ -119,11 +119,12 @@ dataSourcesRouter.post("/:id/read", requireRole("admin"), async (req, res) => {
   if (record.type === "webhook" || record.type === "mqtt" || record.type === "gpio-input" || record.type === "gpio-output" || record.type === "pi-camera" || record.type === "http-output" || record.type === "mqtt-output") return badRequest(res, "This device cannot be read manually", { sourceId: record.id, type: record.type });
 
   try {
-    if (record.type === "bme-sensor") {
-      const config = parseBmeSensorConfig(JSON.parse(record.config) as unknown);
-      const result = await readBmeSensorSource(config);
+    if (record.type === "bme-sensor" || record.type === "bh1750-sensor") {
+      const savedConfig = JSON.parse(record.config) as unknown;
+      const config = record.type === "bh1750-sensor" ? parseBh1750SensorConfig(savedConfig) : parseBmeSensorConfig(savedConfig);
+      const result = config.sensor === "bh1750" ? await readBh1750SensorSource(config) : await readBmeSensorSource(config);
       const updated = updateDataSourceReadResult(req.params.id, { hash: result.bytesHash, preview: result.preview });
-      createDataSourceRead({ dataSourceId: record.id, sourceName: record.name, sourceUrl: bmeSensorUrl(config), triggerType: "manual", status: "success", hash: result.bytesHash, preview: result.preview });
+      createDataSourceRead({ dataSourceId: record.id, sourceName: record.name, sourceUrl: i2cSensorUrl(config), triggerType: "manual", status: "success", hash: result.bytesHash, preview: result.preview });
       return res.json({ item: serializeDataSource(updated), result });
     }
 
@@ -170,10 +171,10 @@ dataSourcesRouter.post("/:id/test-output", requireRole("admin"), async (req, res
 });
 
 function isSupportedDeviceType(type: string) {
-  return type === "json-api" || type === "webhook" || type === "mqtt" || type === "gpio-input" || type === "gpio-output" || type === "pi-camera" || type === "bme-sensor" || type === "device-system-data" || type === "http-output" || type === "mqtt-output";
+  return type === "json-api" || type === "webhook" || type === "mqtt" || type === "gpio-input" || type === "gpio-output" || type === "pi-camera" || type === "bme-sensor" || type === "bh1750-sensor" || type === "device-system-data" || type === "http-output" || type === "mqtt-output";
 }
 
-function bmeSensorUrl(config: { sensor: string; bus: number; address: string }) {
+function i2cSensorUrl(config: { sensor: string; bus: number; address: string }) {
   return `${config.sensor}:i2c-${config.bus}:${config.address}`;
 }
 
@@ -182,7 +183,8 @@ function deviceSystemDataUrl() {
 }
 
 function sourceUrlForReadFailure(type: string, config: unknown) {
-  if (type === "bme-sensor") return bmeSensorUrl(parseBmeSensorConfig(config));
+  if (type === "bh1750-sensor") return i2cSensorUrl(parseBh1750SensorConfig(config));
+  if (type === "bme-sensor") return i2cSensorUrl(parseBmeSensorConfig(config));
   if (type === "device-system-data") return deviceSystemDataUrl();
   return parseJsonApiConfig(config).url;
 }

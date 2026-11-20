@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import express from "express";
 import request from "supertest";
-import { afterAll, beforeAll, describe, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, it, vi } from "vitest";
 import { setupTestDatabase } from "../../helpers/testDatabase.js";
 import { WORKFLOW_RUN_BUDGET_MAX_RUNS } from "../../../src/features/automation/automation.policy.js";
 
@@ -15,22 +15,65 @@ let db: Awaited<ReturnType<typeof setupTestDatabase>>["db"];
 let app: express.Express;
 let workflows: typeof import("../../../src/features/automation/automation.repository.js");
 let dataSources: typeof import("../../../src/features/data-sources/dataSources.repository.js");
+let sensorEnv: typeof import("../../../src/config/env.js")["env"];
 
 beforeAll(async () => {
   const testDb = await setupTestDatabase();
   teardown = testDb.teardown;
   db = testDb.db;
-  const { dataSourcesWebhookRouter } = await import("../../../src/features/data-sources/dataSources.routes.js");
+  const { dataSourcesRouter, dataSourcesWebhookRouter } = await import("../../../src/features/data-sources/dataSources.routes.js");
+  sensorEnv = (await import("../../../src/config/env.js")).env;
   workflows = await import("../../../src/features/automation/automation.repository.js");
   dataSources = await import("../../../src/features/data-sources/dataSources.repository.js");
 
   app = express();
   app.use(express.json());
   app.use("/api/data-source-webhooks", dataSourcesWebhookRouter);
+  app.use("/api/data-sources", (req, _res, next) => {
+    req.user = { id: "admin", displayName: "Admin", role: "admin", lastLogin: null, credentialType: "password" };
+    next();
+  }, dataSourcesRouter);
 });
+
+afterEach(() => { vi.unstubAllGlobals(); });
 
 afterAll(() => {
   teardown();
+});
+
+describe("BH1750 device create/edit/manual read", () => {
+  it("validates config, preserves the saved identity on edit and stores a zero-lux read and hash", async () => {
+    const invalid = await request(app).post("/api/data-sources").send({ name: "Light", type: "bh1750-sensor", config: { address: "0x76" } });
+    assert.equal(invalid.status, 400);
+    assert.match(invalid.body.error, /config.address/);
+    const created = await request(app).post("/api/data-sources").send({ name: "Light", type: "bh1750-sensor", config: {} });
+    assert.equal(created.status, 200);
+    const id = created.body.item.id;
+    assert.deepEqual(created.body.item.config, { sensor: "bh1750", bus: 1, address: "0x23" });
+    const edited = await request(app).patch(`/api/data-sources/${id}`).send({ name: "Room light", type: "bh1750-sensor", config: { bus: 1, address: "0x5c" } });
+    assert.equal(edited.status, 200);
+    assert.equal(edited.body.item.id, id);
+    const enabled = sensorEnv.sensorsEnabled;
+    sensorEnv.sensorsEnabled = true;
+    const preview = { sensor: "bh1750", bus: 1, address: "0x5c", lux: 0, readAt: "2026-11-19T00:00:00Z" };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(preview))));
+    try {
+      const read = await request(app).post(`/api/data-sources/${id}/read`).send({});
+      assert.equal(read.status, 200);
+      assert.deepEqual(read.body.item.lastPreview, preview);
+      assert.equal(read.body.item.lastHash, read.body.result.bytesHash);
+      const stored = db.prepare("SELECT source_url, status, hash FROM data_source_reads WHERE data_source_id = ?").get(id) as { source_url: string; status: string; hash: string };
+      assert.deepEqual(stored, { source_url: "bh1750:i2c-1:0x5c", status: "success", hash: read.body.result.bytesHash });
+
+      vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("sensor disconnected")));
+      const failed = await request(app).post(`/api/data-sources/${id}/read`).send({});
+      assert.equal(failed.status, 502);
+      assert.match(failed.body.item.lastError, /sensor disconnected/);
+      assert.equal((db.prepare("SELECT COUNT(*) AS count FROM data_source_reads WHERE data_source_id = ? AND status = 'failed'").get(id) as { count: number }).count, 1);
+    } finally {
+      sensorEnv.sensorsEnabled = enabled;
+    }
+  });
 });
 
 let tokenCounter = 0;

@@ -521,6 +521,7 @@ export function sourceLabel(source: DataSource) {
     return `${source.config.sensor ?? "bme280"} i2c-${source.config.bus ?? 1} ${source.config.address ?? "0x76"}`;
   }
   if (source.type === "device-system-data") return "device-system-data:local";
+  if (source.type === "bh1750-sensor") return `bh1750 i2c-${source.config.bus ?? 1} ${source.config.address ?? "0x23"}`;
   return source.config.url ?? "HTTP JSON Source";
 }
 
@@ -528,6 +529,7 @@ export function isReadableSource(source: DataSource) {
   return (
     source.type === "json-api" ||
     source.type === "bme-sensor" ||
+    source.type === "bh1750-sensor" ||
     source.type === "device-system-data"
   );
 }

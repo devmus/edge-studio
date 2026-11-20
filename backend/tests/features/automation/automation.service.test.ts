@@ -13,6 +13,7 @@ const {
   sendMultipartMediaOutputMock,
   serializeDataSourceMock,
   readBmeSensorSourceMock,
+  readBh1750SensorSourceMock,
   pulseGpioOutputMock,
   publishMqttOutputMock,
   capturePiCameraMock,
@@ -27,6 +28,7 @@ const {
   sendMultipartMediaOutputMock: vi.fn(),
   serializeDataSourceMock: vi.fn(),
   readBmeSensorSourceMock: vi.fn(),
+  readBh1750SensorSourceMock: vi.fn(),
   pulseGpioOutputMock: vi.fn(),
   publishMqttOutputMock: vi.fn(),
   capturePiCameraMock: vi.fn(),
@@ -40,6 +42,7 @@ vi.mock("../../../src/features/data-sources/dataSources.service.js", () => ({
   parseJsonApiConfig: (value: unknown) => value,
   parseHttpOutputConfig: (value: unknown) => value,
   parseBmeSensorConfig: (value: unknown) => value,
+  parseBh1750SensorConfig: (value: unknown) => value,
   parseDeviceSystemDataConfig: (value: unknown) => value,
   readJsonApiSource: readJsonApiSourceMock,
   readDeviceSystemDataSource: readDeviceSystemDataSourceMock,
@@ -49,7 +52,8 @@ vi.mock("../../../src/features/data-sources/dataSources.service.js", () => ({
 }));
 
 vi.mock("../../../src/features/data-sources/sensorHelper.service.js", () => ({
-  readBmeSensorSource: readBmeSensorSourceMock
+  readBmeSensorSource: readBmeSensorSourceMock,
+  readBh1750SensorSource: readBh1750SensorSourceMock
 }));
 
 vi.mock("../../../src/features/data-sources/gpioOutput.service.js", () => ({
@@ -116,6 +120,7 @@ beforeEach(() => {
   sendMultipartMediaOutputMock.mockReset();
   serializeDataSourceMock.mockReset();
   readBmeSensorSourceMock.mockReset();
+  readBh1750SensorSourceMock.mockReset();
   pulseGpioOutputMock.mockReset();
   publishMqttOutputMock.mockReset();
   capturePiCameraMock.mockReset();
@@ -151,6 +156,26 @@ function makeRecipient() {
 function createSource(type: string, config: unknown, name = "Source") {
   return dataSourcesRepo.createDataSource({ name, type, config });
 }
+
+describe("BH1750 workflow reads", () => {
+  it.each(["manual", "schedule"] as const)("stores lux and the reading reference for a %s run", async (trigger) => {
+    const config = { sensor: "bh1750", bus: 1, address: "0x23" };
+    const source = dataSourcesRepo.createDataSource({ name: "Room light", type: "bh1750-sensor", config });
+    const preview = { ...config, lux: 120, readAt: "2026-11-19T00:00:00Z" };
+    readBh1750SensorSourceMock.mockResolvedValue({ preview, bytesHash: "light-hash", canonicalBytes: JSON.stringify(preview) });
+    const workflow = makeWorkflow([
+      { type: trigger === "manual" ? "manual_start" : "schedule_start", config: { intervalSeconds: 60 } },
+      { type: "fetch_data_source", config: { sourceId: source.id } }
+    ]);
+    await service.executeWorkflow(workflow, { type: trigger });
+    assert.deepEqual(readBh1750SensorSourceMock.mock.calls[0], [config]);
+    assert.equal(dataSourcesRepo.getDataSource(source.id)!.last_hash, "light-hash");
+    assert.deepEqual(JSON.parse(dataSourcesRepo.getDataSource(source.id)!.last_preview!), preview);
+    const stored = db.prepare("SELECT source_url, trigger_type, status FROM data_source_reads WHERE data_source_id = ?").get(source.id);
+    assert.deepEqual(stored, { source_url: "bh1750:i2c-1:0x23", trigger_type: trigger, status: "success" });
+    assert.equal(readJsonApiSourceMock.mock.calls.length, 0);
+  });
+});
 
 describe("automation.service — serializers", () => {
   it("serializes a workflow with its blocks and structured last error", () => {

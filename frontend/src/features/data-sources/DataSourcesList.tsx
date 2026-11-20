@@ -428,6 +428,7 @@ function sourceTypeLabel(source: DataSource) {
   if (source.type === "gpio-input") return "GPIO Input Pin";
   if (source.type === "gpio-output") return "GPIO LED";
   if (source.type === "pi-camera") return "Raspberry Pi Camera";
+  if (source.type === "bh1750-sensor") return "BH1750 Light Sensor";
   if (source.type === "bme-sensor")
     return source.config.sensor === "bme680"
       ? "BME680 Environmental Sensor"
@@ -458,6 +459,7 @@ function isInputSource(source: DataSource) {
     source.type === "gpio-input" ||
     source.type === "pi-camera" ||
     source.type === "bme-sensor" ||
+    source.type === "bh1750-sensor" ||
     source.type === "device-system-data"
   );
 }
@@ -473,6 +475,7 @@ function sourceEndpoint(source: DataSource) {
   if (source.type === "gpio-output") return gpioOutputEndpoint(source);
   if (source.type === "pi-camera") return cameraEndpoint(source);
   if (source.type === "bme-sensor") return bmeEndpoint(source);
+  if (source.type === "bh1750-sensor") return `bh1750 i2c-${source.config.bus ?? 1} ${source.config.address ?? "0x23"}`;
   if (source.type === "device-system-data") return "device-system-data:local";
   return source.config.url;
 }

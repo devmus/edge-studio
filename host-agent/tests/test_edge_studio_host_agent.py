@@ -330,11 +330,16 @@ class HostAgentWriteTests(unittest.TestCase):
 
         with patch.object(self.agent, "missing_sensor_prerequisites_message", return_value=None):
             with patch.object(self.agent, "helper_user", return_value="root"):
-                with patch.object(self.agent, "run", return_value=self.agent.subprocess.CompletedProcess([], 0, "", "")):
+                with patch.object(self.agent, "run", return_value=self.agent.subprocess.CompletedProcess([], 0, "", "")) as run:
                     with patch.object(self.agent, "restart_backend", return_value={"ok": True, "scheduled": True}):
                         with patch.object(self.agent, "sensor_status", return_value={"state": "enabled"}):
                             self.agent.apply_sensors()
                             self.agent.apply_sensors()
+
+        installs = [call.args[0] for call in run.call_args_list if "pip" in call.args[0]]
+        self.assertEqual(installs, [[str(sensor_python), "-m", "pip", "install", "bme680", "smbus2"]] * 2)
+        self.assertFalse(any("venv" in call.args[0] for call in run.call_args_list))
+        self.assertTrue(sensor_python.exists())
 
         env_content = self.agent.ENV_FILE.read_text(encoding="utf-8")
         service_content = self.agent.SENSOR_SERVICE_FILE.read_text(encoding="utf-8")

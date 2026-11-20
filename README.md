@@ -111,13 +111,15 @@ After install, an admin can enable or disable camera support from Devices -> Har
 
 `ENABLE_CAMERA=true` does not install host camera drivers or enable the Raspberry Pi camera stack. Before using camera workflows, verify the Pi host can see the camera with `libcamera-still --list-cameras` or `rpicam-still --list-cameras`. Camera Module 3 (`imx708`) requires a host OS/kernel/libcamera stack that supports it. The helper uses the host camera tools, not camera binaries inside the backend container.
 
-Advanced: to enable BME280/BME680 I2C environmental sensor devices during install, pass `ENABLE_SENSORS=true`:
+Advanced: to enable BME280/BME680 environmental or BH1750 light sensor devices over I2C during install, pass `ENABLE_SENSORS=true`:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/edge-studio-technology/edge-studio/main/install.sh | sudo env ENABLE_SENSORS=true bash
 ```
 
 `ENABLE_SENSORS=true` installs and starts a host-side `edge-studio-sensor-helper` systemd service, generates a `SENSOR_HELPER_TOKEN`, and writes backend configuration so the Docker backend can call the helper through the fixed Edge Studio Compose gateway. Leave it disabled unless this deployment needs direct I2C sensor reads. The Pi's I2C interface must also be enabled on the host, and the Pi may need a reboot before `/dev/i2c-1` appears. BME680 reads require the Python `bme680` module; the installer creates a dedicated sensor-helper virtualenv and installs the module there when sensor support is enabled.
+
+BH1750 light sensors use the same opt-in helper and report `lux` through manual reads or workflow **Fetch data source** blocks. After updating an existing installation, **Repair I2C sensors** installs `smbus2` in the managed sensor-helper virtualenv and restarts the helper. For Adafruit STEMMA QT product 4681, wire VIN to 3.3V, GND to ground, SCL to physical pin 5 and SDA to physical pin 3; use bus `1`, address `0x23` unless the board address has been changed to `0x5c`. See the [BH1750 setup guide and physical verification status](docs/guides/bh1750-sensor.md).
 
 Advanced: to enable the optional local MQTT broker during install, pass `ENABLE_MQTT_BROKER=true`:
 

@@ -81,6 +81,7 @@ export function getDeviceSetupGuide(source: DataSource): DeviceSetupGuide | null
   if (source.type === "gpio-input") return gpioInputGuide(source);
   if (source.type === "gpio-output") return gpioLedGuide(source);
   if (source.type === "bme-sensor") return bmeSensorGuide(source);
+  if (source.type === "bh1750-sensor") return bh1750SensorGuide(source);
   if (source.type === "device-system-data") return deviceSystemDataGuide(source);
   if (source.type === "pi-camera") return piCameraGuide(source);
   if (source.type === "json-api")
@@ -491,6 +492,34 @@ function basicWorkflow(source: DataSource): DeviceGuideWorkflowInput {
       },
     ],
   };
+}
+
+function bh1750SensorGuide(source: DataSource) {
+  return guide(source, "BH1750 Light Sensor Setup", "Read ambient light in lux from the Adafruit BH1750 STEMMA QT (product 4681) connected directly to the Pi I2C bus.", [
+    { title: "Requirements", items: [
+      "Enable I2C sensors in Devices -> Hardware support and enable the Pi host I2C interface. Reboot if /dev/i2c-1 is missing.",
+      "For an existing installation, Repair I2C sensors to refresh the helper and install smbus2 in its managed virtualenv.",
+      "Power off the Pi before wiring. Use 3.3V and match the board labels; STEMMA QT is the connector for the same I2C signals.",
+    ] },
+    { title: "Wiring", schematic: "pi-gpio", table: [
+      ["VIN", "3.3V / physical pin 1"], ["GND", "Ground / physical pin 6"],
+      ["SCL", "GPIO3 / physical pin 5"], ["SDA", "GPIO2 / physical pin 3"],
+      ["ADDR", "Leave at default for 0x23; pull high to 3.3V for 0x5c"],
+    ] },
+    { title: "Saved settings", table: [
+      ["Sensor", "BH1750"], ["I2C bus", String(source.config.bus ?? 1)], ["I2C address", source.config.address ?? "0x23"],
+    ] },
+    { title: "Verify", items: [
+      "Click manual read in Devices. Confirm lux, sensor, bus, address, and readAt appear in the saved JSON preview and read history. Zero lux is a valid dark reading.",
+      "Shade the sensor, then expose it to light and read again. The lux value should change.",
+      "Create the disabled basic workflow below, then run it manually. For regular readings, replace Manual start with Schedule and choose the interval.",
+    ] },
+    { title: "Troubleshooting", items: [
+      "If reads fail, check wiring, bus 1 and the actual address (0x23 by default, 0x5c only with ADDR high). Check i2cdetect -y 1 if installed.",
+      "If the helper is unavailable or lacks BH1750 support, check Hardware support and Repair I2C sensors. Enabling support does not prove a sensor is connected.",
+      "A full-scale reading may be saturated. Fixed high-resolution readings are provided without calibration or automatic range adjustment.",
+    ] },
+  ], "docs/guides/bh1750-sensor.md");
 }
 
 function bmeSensorGuide(source: DataSource) {

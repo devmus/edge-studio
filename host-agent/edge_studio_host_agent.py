@@ -501,7 +501,7 @@ def apply_sensors():
     sensor_python = sensor_venv / "bin" / "python"
     if not sensor_python.exists():
         run(["python3", "-m", "venv", "--system-site-packages", str(sensor_venv)])
-    run([str(sensor_python), "-m", "pip", "install", "bme680"], check=False)
+    run([str(sensor_python), "-m", "pip", "install", "bme680", "smbus2"], check=False)
 
     user = helper_user()
     supplementary_groups = "SupplementaryGroups=i2c" if run(["getent", "group", "i2c"], check=False).returncode == 0 else ""
