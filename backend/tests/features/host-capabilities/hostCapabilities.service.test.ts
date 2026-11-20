@@ -92,6 +92,15 @@ describe("hostCapabilities.service", () => {
     await assert.rejects(service.enableHostCameraCapability(), /boom/);
   });
 
+  it("uses the fixed SPI prerequisite endpoint with bearer authentication", async () => {
+    fetchMock.mockResolvedValue(response(200, { capability: { name: "displays" }, steps: [], rebootRequired: true }));
+    const result = await service.setupHostDisplayPrerequisites();
+    assert.equal(result.rebootRequired, true);
+    assert.equal(fetchMock.mock.calls[0][0], "http://host-agent/capabilities/displays/setup-prerequisites");
+    assert.equal(fetchMock.mock.calls[0][1].method, "POST");
+    assert.equal(fetchMock.mock.calls[0][1].headers.Authorization, "Bearer token-1");
+  });
+
   it("falls back to HTTP status when the error response has no JSON payload", async () => {
     fetchMock.mockResolvedValue({ ok: false, status: 502, json: async () => { throw new Error("not json"); } });
 

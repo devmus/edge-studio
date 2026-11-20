@@ -8,7 +8,8 @@ Product: [Pimoroni PIM576](https://shop.pimoroni.com/en-eu/products/1-54-spi-col
 
 - Target test platform: Raspberry Pi 4 Model B, Debian 13 (trixie), aarch64. Physical PIM576 verification on this setup is **pending**.
 - Direct Pi SPI connection using the fixed wiring below: one display on SPI0 CE0, DC GPIO25, backlight GPIO24. The application rejects a second configured display and collisions with configured GPIO devices on these pins. Other processes or HATs can still claim the pins; stop competing drivers before testing.
-- Host devices `/dev/spidev0.0` and `/dev/gpiochip0`. Enable SPI using `sudo raspi-config` → Interface Options → SPI on Raspberry Pi OS. On a Debian Pi installation without raspi-config, enable `dtparam=spi=on` in the host's active Pi boot configuration, then reboot. Use the host OS documentation to locate its boot configuration; do not assume a path on every OS.
+- Host devices `/dev/spidev0.0` and `/dev/gpiochip0`. Start in **Devices → Hardware support → SPI displays**. If prerequisites are missing, choose **Automatic setup** to install Python prerequisites and enable host SPI using the fixed `raspi-config nonint do_spi 0` action. Setup reports whether a reboot is required; it never reboots or enables the display helper automatically. After any reboot, refresh Hardware support and select Enable.
+- Automatic setup requires the host's `apt-get` and `raspi-config`; it checks both before making changes. Use the module's **Manual setup** option on other systems. On Debian without raspi-config, enable `dtparam=spi=on` in the host's active Pi boot configuration, then reboot. Use the host OS documentation to locate its boot configuration; do not assume a path on every OS. The app does not add package repositories or edit arbitrary boot files.
 - Python 3 with virtualenv/build support. Hardware support shows copyable commands for `python3-venv`, `python3-dev` and `build-essential` if needed. The helper runs as the installer-selected user with the `spi` and `gpio` groups where present; the devices must be accessible to that user.
 - **Devices → Hardware support → SPI displays → Enable**. Enable/Repair creates `.venv-display-helper` and installs `st7789==1.0.1` and `Pillow>=10.1,<13`. First setup may take several minutes and needs package-index connectivity. Dependencies retain their own licenses; no upstream driver code is vendored.
 
@@ -54,7 +55,7 @@ No MISO or reset wire is used. The driver performs software reset. Keep wires sh
 
 ## Add, test and edit the screen
 
-1. Enable **SPI displays** under Hardware support; follow the prerequisite steps and reboot if needed.
+1. Open **SPI displays** under Hardware support. If Action required is shown, choose **Automatic setup** (or Manual setup on an unsupported host). Reboot only if requested, refresh status, then select **Enable**. Host prerequisite setup, helper enablement and device creation are separate operations.
 2. In **Devices → New device**, select **PIM576 SPI LCD**. The option is hidden until display support is enabled.
 3. Give it a name, select rotation `0`, `90`, `180` or `270` degrees, review and save. Saving the device does not send an output.
 4. From the device menu select **Test display**. It deliberately sends `Edge Studio` / `Display connected` to the physical panel.

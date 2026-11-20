@@ -63,6 +63,7 @@ const protectedPrefixes = [
 const adminOnlyRoutes: [method: "get" | "post" | "patch" | "delete", path: string][] = [
   ["post", "/api/host-capabilities/displays/enable"],
   ["post", "/api/host-capabilities/displays/disable"],
+  ["post", "/api/host-capabilities/displays/setup-prerequisites"],
     ["get", "/api/auth/settings/session"],
     ["post", "/api/auth/settings/session"],
     ["get", "/api/retention/camera"],

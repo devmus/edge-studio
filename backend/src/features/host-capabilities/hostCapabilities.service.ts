@@ -43,6 +43,10 @@ export async function disableHostDisplayCapability() {
   return hostAgentActionRequest("/capabilities/displays/disable");
 }
 
+export async function setupHostDisplayPrerequisites() {
+  return hostAgentRequest<HostSensorPrerequisiteSetupResponse>("/capabilities/displays/setup-prerequisites", { method: "POST" }, HOST_AGENT_SETUP_TIMEOUT_MS);
+}
+
 export async function disableHostCameraCapability() {
   debugHostCapability("post", "/capabilities/camera/disable");
   return hostAgentActionRequest("/capabilities/camera/disable");

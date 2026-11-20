@@ -35,12 +35,13 @@ for I2C, whose setup steps on Raspberry Pi OS are fixed and already shown in the
   and retry-safe.
 - **Installer and agent share one implementation.** The agent owns enable/disable after install;
   the installer's `ENABLE_*` shortcuts call the same code in CLI install mode.
-- **Missing prerequisites are reported, not fixed,** with one exception: a separate, explicit
+- **OS prerequisites change only through explicit setup actions.** The separate
   I2C prerequisite action (`POST /api/host-capabilities/sensors/setup-prerequisites`) runs the
   hardcoded Raspberry Pi OS steps `apt-get update`, `apt-get install -y python3-smbus i2c-tools`,
   `raspi-config nonint do_i2c 0`. It returns step labels, success, the resulting capability, and
   whether a reboot is needed, never raw output, and records an audit event. Manual steps stay
   available.
+- **SPI prerequisite setup is also explicit.** Hardware support offers Automatic setup separately from display enablement. The root action checks for `apt-get` and `raspi-config`, installs fixed Python environment/build prerequisites and calls `raspi-config nonint do_spi 0`. It reports step success and whether `/dev/spidev0.0` is still absent; no helper enablement or reboot is implied. This follows the I2C boundary while leaving manual guidance for Debian hosts without the required tools; it does not introduce arbitrary boot-file editing or package-repository management.
 - **Host-backed devices follow capability state.** Unavailable templates are hidden, configured
   devices show `Disabled`/`Needs attention`, and workflow validation reports the missing support.
 - The agent's own code is updated through signed host-runtime artifacts delivered by
@@ -76,6 +77,7 @@ for I2C, whose setup steps on Raspberry Pi OS are fixed and already shown in the
 
 ## History
 
+- 2026-11-20: Added explicit SPI prerequisite setup in Hardware support, with manual fallback and operator-managed reboot.
 - 2026-11-20: Added a narrow SPI text-display helper, fixed PIM576 wiring, managed driver dependencies and explicit first-adoption installer refresh.
 - 2026-11-19: BH1750 raw I2C lux reads, fixed conversion timing, managed smbus2 dependency and serialized measurements within the existing sensor capability.
 - 2026-11-03: Terminal uninstaller and Settings instructions; retained-data and host-resource ownership boundaries.

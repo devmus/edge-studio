@@ -223,6 +223,7 @@ export function LocalServicesCard({
   onEnableMqtt,
   onDisableMqtt,
   onSetupSensorPrerequisites,
+  onSetupDisplayPrerequisites,
   onRefreshHardware,
 }: {
   capabilities: DataSourceCapabilities | null;
@@ -239,6 +240,7 @@ export function LocalServicesCard({
   onEnableMqtt?: () => Promise<void>;
   onDisableMqtt?: () => Promise<void>;
   onSetupSensorPrerequisites?: () => Promise<void>;
+  onSetupDisplayPrerequisites?: () => Promise<void>;
   onRefreshHardware?: () => Promise<void>;
 }) {
   const [managerOpen, setManagerOpen] = useState(false);
@@ -364,12 +366,12 @@ export function LocalServicesCard({
                 busy={busy}
                 lanUrl={lanUrl}
                 internalUrl={internalUrl}
-                onSetupSensorPrerequisites={onSetupSensorPrerequisites}
+                onSetupPrerequisites={selectedItem.name === "displays" ? onSetupDisplayPrerequisites : onSetupSensorPrerequisites}
                 onRefreshHardware={onRefreshHardware}
               />
             </div>
             <ErrorAlert status="warning" className="max-w-none py-detail-tight">
-              Optional hardware starts disabled by default. Edge Studio changes app service configuration only; OS interfaces and packages stay operator-managed.
+              Optional hardware starts disabled by default. OS interfaces and packages change only through an explicit prerequisite setup action or manual host setup; reboots remain operator-managed.
             </ErrorAlert>
           </div>
         </Modal>
@@ -452,14 +454,14 @@ function HardwareDetailPanel({
   busy,
   lanUrl,
   internalUrl,
-  onSetupSensorPrerequisites,
+  onSetupPrerequisites,
   onRefreshHardware,
 }: {
   item: HardwareItem;
   busy: boolean;
   lanUrl: string;
   internalUrl: string;
-  onSetupSensorPrerequisites?: () => Promise<void>;
+  onSetupPrerequisites?: () => Promise<void>;
   onRefreshHardware?: () => Promise<void>;
 }) {
   const capability = item.capability;
@@ -498,7 +500,7 @@ function HardwareDetailPanel({
           <CompactCopyRow label="Internal URL" value={internalUrl} description="Edge Studio MQTT configs" />
         </div>
       )}
-      <HardwarePrerequisites capability={capability} busy={busy} onSetupSensorPrerequisites={onSetupSensorPrerequisites} onRefreshHardware={onRefreshHardware} />
+      <HardwarePrerequisites capability={capability} busy={busy} onSetupPrerequisites={onSetupPrerequisites} onRefreshHardware={onRefreshHardware} />
     </section>
   );
 }
@@ -583,12 +585,12 @@ function StatusDot({ status }: { status: "good" | "neutral" | "warn" | "error" }
 function HardwarePrerequisites({
   capability,
   busy,
-  onSetupSensorPrerequisites,
+  onSetupPrerequisites,
   onRefreshHardware,
 }: {
   capability?: HostCapability;
   busy: boolean;
-  onSetupSensorPrerequisites?: () => Promise<void>;
+  onSetupPrerequisites?: () => Promise<void>;
   onRefreshHardware?: () => Promise<void>;
 }) {
   const [manualOpen, setManualOpen] = useState(false);
@@ -597,14 +599,14 @@ function HardwarePrerequisites({
   if (!guidance) return null;
   const isBlocking = capability.state === "missing_prerequisites";
   if (!isBlocking) return null;
-  const showSensorSetupChoice = capability.name === "sensors";
+  const showSetupChoice = capability.name === "sensors" || capability.name === "displays";
   return (
     <div className="border-stroke-secondary grid border-t">
-      {showSensorSetupChoice && (
+      {showSetupChoice && (
         <div className="gap-detail-next grid px-detail-close py-detail-next">
           <p className="type-meta text-text-secondary m-0">Choose automatic setup, or open manual steps if you prefer to run the commands yourself.</p>
           <div className="gap-detail-next flex flex-wrap">
-            <Button type="button" variant="primary" size="sm" disabled={busy || !onSetupSensorPrerequisites} onClick={() => void onSetupSensorPrerequisites?.()}>
+            <Button type="button" variant="primary" size="sm" disabled={busy || !onSetupPrerequisites} onClick={() => void onSetupPrerequisites?.()}>
               Automatic setup
             </Button>
             <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={() => setManualOpen(true)}>
@@ -613,18 +615,18 @@ function HardwarePrerequisites({
           </div>
         </div>
       )}
-    {(!showSensorSetupChoice || manualOpen) && (
+    {(!showSetupChoice || manualOpen) && (
       <Disclosure
       title={
         <span className="gap-detail-close flex flex-wrap items-center">
-          <span>{showSensorSetupChoice ? "Manual setup steps" : "Setup steps"}</span>
+          <span>{showSetupChoice ? "Manual setup steps" : "Setup steps"}</span>
           <Pill tone="warn">Action needed</Pill>
         </span>
       }
-      open={showSensorSetupChoice ? manualOpen : undefined}
+      open={showSetupChoice ? manualOpen : undefined}
       defaultOpen={false}
-      onToggle={(event) => showSensorSetupChoice && setManualOpen(event.currentTarget.open)}
-      className={`${showSensorSetupChoice ? "" : "border-stroke-secondary border-t"} bg-surface-primary p-0`}
+      onToggle={(event) => showSetupChoice && setManualOpen(event.currentTarget.open)}
+      className={`${showSetupChoice ? "" : "border-stroke-secondary border-t"} bg-surface-primary p-0`}
       summaryClassName="px-detail-close py-detail-next"
       contentClassName="grid gap-detail-next pb-detail-next"
     >

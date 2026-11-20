@@ -651,6 +651,24 @@ def disable_mqtt():
     return {"capability": mqtt_status(), "restart": backend_restart, "service": restart}
 
 
+def setup_display_prerequisites():
+    if shutil.which("apt-get") is None or shutil.which("raspi-config") is None:
+        raise ValueError("Automatic SPI setup requires apt-get and raspi-config. Use the manual setup steps for this OS.")
+    steps = []
+    for label, command in [
+        ("Update package lists", ["apt-get", "update"]),
+        ("Install display Python prerequisites", ["apt-get", "install", "-y", "python3-venv", "python3-dev", "build-essential"]),
+        ("Enable SPI interface", ["raspi-config", "nonint", "do_spi", "0"]),
+    ]:
+        completed = run(command, check=False, timeout=300)
+        steps.append({"label": label, "ok": completed.returncode == 0})
+        if completed.returncode != 0:
+            raise ValueError(f"Automatic SPI setup failed during: {label}")
+    spi_exists = Path("/dev/spidev0.0").exists()
+    steps.append({"label": "Check /dev/spidev0.0", "ok": spi_exists})
+    return {"capability": display_status(), "steps": steps, "rebootRequired": not spi_exists}
+
+
 def display_status():
     config = read_env()
     enabled = is_truthy(config.get("ENABLE_DISPLAYS"))
@@ -658,13 +676,16 @@ def display_status():
     spi_exists = Path("/dev/spidev0.0").exists()
     gpio_exists = Path("/dev/gpiochip0").exists()
     python = APP_DIR / ".venv-display-helper" / "bin" / "python"
+    python_ready = python.exists() or (shutil.which("python3") is not None and run(["python3", "-c", "import venv, ensurepip"], check=False, timeout=5).returncode == 0)
     dependencies = python.exists() and run([str(python), "-c", "import st7789; from PIL import ImageFont; ImageFont.load_default(size=20)"], check=False, timeout=10).returncode == 0
-    checks.update({"spiDeviceExists": spi_exists, "gpioDeviceExists": gpio_exists, "dependenciesAvailable": dependencies})
+    checks.update({"spiDeviceExists": spi_exists, "gpioDeviceExists": gpio_exists, "dependenciesAvailable": dependencies, "pythonVenvAvailable": python_ready})
     available = enabled and spi_exists and gpio_exists and dependencies and checks["serviceActive"] and checks["serviceEnabled"]
     if not spi_exists:
         reason = "Enable SPI on the Pi host and reboot if /dev/spidev0.0 is missing."
     elif not gpio_exists:
         reason = "/dev/gpiochip0 is missing. This display requires a compatible Raspberry Pi GPIO interface."
+    elif not python_ready:
+        reason = "Python virtualenv prerequisites are missing. Use Automatic setup or the manual setup steps."
     elif not enabled:
         reason = "SPI display support is disabled."
     elif not dependencies:
@@ -674,7 +695,7 @@ def display_status():
     else:
         reason = None
     return {"name": "displays", "enabled": enabled, "installed": checks["serviceFileExists"], "available": available,
-            "state": "enabled" if available else "missing_prerequisites" if not spi_exists or not gpio_exists else "disabled" if not enabled else "failed",
+            "state": "enabled" if available else "missing_prerequisites" if not spi_exists or not gpio_exists or not python_ready else "disabled" if not enabled else "failed",
             "reason": reason, "checks": checks, "devicePath": "/dev/spidev0.0"}
 
 
@@ -964,6 +985,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(200, setup_sensor_prerequisites())
             if path == "/capabilities/displays/apply":
                 return self.send_json(200, apply_displays())
+            if path == "/capabilities/displays/setup-prerequisites":
+                return self.send_json(200, setup_display_prerequisites())
             if path == "/capabilities/displays/disable":
                 return self.send_json(200, disable_displays())
             if path == "/updates/host-runtime/apply":

@@ -428,6 +428,41 @@ class HostAgentWriteTests(unittest.TestCase):
         self.assertFalse(status["available"])
         self.assertIn("/dev/i2c-1 was not found", status["reason"])
 
+    def test_spi_setup_runs_only_fixed_steps_and_reports_reboot_without_enabling_or_rebooting(self):
+        for device_exists in (True, False):
+            with self.subTest(device_exists=device_exists), patch.object(self.agent.shutil, "which", return_value="/usr/bin/tool"), patch.object(self.agent, "run", return_value=self.agent.subprocess.CompletedProcess([], 0, "", "")) as run, patch.object(self.agent.Path, "exists", return_value=device_exists), patch.object(self.agent, "display_status", return_value={"name": "displays", "enabled": False}), patch.object(self.agent, "write_env") as write:
+                result = self.agent.setup_display_prerequisites()
+            self.assertEqual([call.args[0] for call in run.call_args_list], [
+                ["apt-get", "update"],
+                ["apt-get", "install", "-y", "python3-venv", "python3-dev", "build-essential"],
+                ["raspi-config", "nonint", "do_spi", "0"],
+            ])
+            self.assertEqual(result["rebootRequired"], not device_exists)
+            self.assertFalse(result["capability"]["enabled"])
+            write.assert_not_called()
+
+    def test_spi_setup_rejects_unsupported_hosts_before_mutating_them(self):
+        for missing in ("apt-get", "raspi-config"):
+            with self.subTest(missing=missing), patch.object(self.agent.shutil, "which", side_effect=lambda name: None if name == missing else "/usr/bin/tool"), patch.object(self.agent, "run") as run:
+                with self.assertRaisesRegex(ValueError, "Use the manual setup"):
+                    self.agent.setup_display_prerequisites()
+                run.assert_not_called()
+
+    def test_display_status_exposes_missing_python_prerequisites_to_the_setup_ui(self):
+        def exists(path):
+            return path.as_posix() in ("/dev/spidev0.0", "/dev/gpiochip0")
+        with patch.object(self.agent.Path, "exists", exists), patch.object(self.agent.shutil, "which", return_value=None), patch.object(self.agent, "service_checks", return_value={"serviceFileExists": False, "serviceActive": False, "serviceEnabled": False}):
+            status = self.agent.display_status()
+        self.assertEqual(status["state"], "missing_prerequisites")
+        self.assertIn("Python virtualenv", status["reason"])
+        self.assertFalse(status["checks"]["pythonVenvAvailable"])
+
+    def test_spi_setup_stops_on_a_failed_step_with_no_success_report(self):
+        with patch.object(self.agent.shutil, "which", return_value="/usr/bin/tool"), patch.object(self.agent, "run", return_value=self.agent.subprocess.CompletedProcess([], 1, "", "private package output")) as run:
+            with self.assertRaisesRegex(ValueError, "failed during: Update package lists"):
+                self.agent.setup_display_prerequisites()
+            self.assertEqual(run.call_count, 1)
+
     def test_setup_sensor_prerequisites_runs_fixed_i2c_steps(self):
         original_exists = self.agent.Path.exists
         commands = []

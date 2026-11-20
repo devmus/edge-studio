@@ -123,6 +123,8 @@ BH1750 light sensors use the same opt-in helper and report `lux` through manual 
 
 Pimoroni PIM576 SPI LCD output is available through **Devices → Hardware support → SPI displays** and the existing workflow **Control device** block. It uses a token-protected host helper, SPI0 CE0, DC GPIO25 and backlight GPIO24. Enable/Repair installs `st7789==1.0.1` and Pillow in `.venv-display-helper`; installer refresh preserves that environment, token and configured port. The advanced `ENABLE_DISPLAYS=true` shortcut enables it during installation after host SPI prerequisites are present. First adoption on an existing installation requires an installer refresh to add the new helper file. It remains off by default, requires no backend SPI/GPIO mount, and is not physically verified yet. See [PIM576 wiring, custom-variable starter workflow and test handoff](docs/guides/pim576-display.md).
 
+SPI prerequisites can be configured explicitly from **Hardware support → SPI displays → Automatic setup** on hosts with `apt-get` and `raspi-config`. The app installs Python prerequisites, enables SPI and reports whether a reboot is needed. It does not reboot or enable the helper automatically. **Manual setup** remains available for other host configurations.
+
 Advanced: to enable the optional local MQTT broker during install, pass `ENABLE_MQTT_BROKER=true`:
 
 ```bash

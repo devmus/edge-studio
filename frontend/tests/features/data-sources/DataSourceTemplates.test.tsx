@@ -195,6 +195,22 @@ describe("LocalServicesCard", () => {
     expect(screen.getByText(/ls -l \/dev\/i2c-1/)).toBeInTheDocument();
   });
 
+  it("offers explicit automatic SPI setup alongside manual guidance without invoking I2C setup", async () => {
+    const onSetupDisplayPrerequisites = vi.fn().mockResolvedValue(undefined);
+    const onSetupSensorPrerequisites = vi.fn();
+    const hostCapabilities: HostCapability[] = [{ name: "displays", enabled: false, installed: false, available: false, state: "missing_prerequisites", reason: "Enable SPI on the host" }];
+    render(<LocalServicesCard capabilities={null} hostCapabilities={hostCapabilities} onSetupDisplayPrerequisites={onSetupDisplayPrerequisites} onSetupSensorPrerequisites={onSetupSensorPrerequisites} />);
+    expect(onSetupDisplayPrerequisites).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "SPI displays: Action required" }));
+    expect(screen.getByRole("button", { name: "Automatic setup" })).toBeEnabled();
+    await userEvent.click(screen.getByRole("button", { name: "Automatic setup" }));
+    expect(onSetupDisplayPrerequisites).toHaveBeenCalledOnce();
+    expect(onSetupSensorPrerequisites).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Manual setup" }));
+    expect(screen.getByText("Enable SPI")).toBeInTheDocument();
+    expect(screen.getByText("Python environment prerequisites")).toBeInTheDocument();
+  });
+
   it("allows disabling an enabled capability even when prerequisites are missing", async () => {
     const onDisableCamera = vi.fn().mockResolvedValue(undefined);
     const hostCapabilities: HostCapability[] = [

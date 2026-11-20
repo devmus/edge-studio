@@ -505,7 +505,7 @@ function basicWorkflow(source: DataSource): DeviceGuideWorkflowInput {
 function spiDisplayGuide(source: DataSource) {
   return guide(source, "PIM576 SPI LCD Setup", "Display text on the Pimoroni 1.54-inch 240×240 SPI LCD. Outputs occur only when you deliberately test or run a workflow.", [
     { title: "Requirements", items: [
-      "Enable host SPI and ensure /dev/spidev0.0 and /dev/gpiochip0 exist. Enable SPI displays in Devices -> Hardware support.",
+      "Open Devices -> Hardware support -> SPI displays. If Action required is shown, choose Automatic setup or Manual setup. Reboot if requested, refresh status, then Enable. Automatic setup requires apt-get and raspi-config and never reboots automatically.",
       "Enable/Repair installs Pimoroni st7789 1.0.1 and Pillow in the managed display-helper virtualenv. First setup may take several minutes.",
       "One PIM576 uses SPI0 CE0 and GPIO8, GPIO10, GPIO11, GPIO24 and GPIO25. Do not assign these pins to another device or process.",
       "Power off the Pi before wiring. Use 3.3V for this setup and BCM numbering where GPIO is named.",

@@ -43,7 +43,7 @@ import {
   type DeviceGuideAction,
 } from "../features/data-sources/deviceSetupGuides";
 import { Esp32SetupGuide } from "../features/data-sources/Esp32FirmwareSetup";
-import { enableDisplaySupport, disableDisplaySupport } from "../features/data-sources/dataSourcesApi";
+import { enableDisplaySupport, disableDisplaySupport, setupDisplayPrerequisites } from "../features/data-sources/dataSourcesApi";
 import { useDeviceFormFields } from "../features/data-sources/useDeviceFormFields";
 
 const HARDWARE_REFRESH_TIMEOUT_MS = 30000;
@@ -252,6 +252,28 @@ export function DataSourcesPage() {
       modalTitle: "Enabling or repairing SPI displays", progressTitle: "Installing display support",
       description: "Installing the managed display driver and restarting the helper. First setup can take several minutes.",
     }, { name: "displays", enabled: true, available: true });
+  }
+
+  async function setupDisplayHardwarePrerequisites() {
+    setBusy(true);
+    setHardwareOperation({
+      modalTitle: "Setting up SPI prerequisites", progressTitle: "Applying host setup",
+      description: "Installing Python prerequisites and enabling the Pi SPI interface. This can take several minutes; any required reboot remains your choice.",
+    });
+    try {
+      const response = await setupDisplayPrerequisites();
+      await refresh();
+      showToast({ tone: response.rebootRequired ? "warning" : "success",
+        title: response.rebootRequired ? "SPI setup applied, reboot required" : "SPI setup applied",
+        message: response.rebootRequired ? "Reboot the Pi, then refresh Hardware support and enable SPI displays." : "Refresh Hardware support, then enable SPI displays.",
+      });
+    } catch (error) {
+      showToast({ tone: "error", title: "Automatic SPI setup failed", message: error instanceof Error ? error.message : "Unknown error" });
+      await refresh().catch(() => undefined);
+    } finally {
+      setHardwareOperation(null);
+      setBusy(false);
+    }
   }
 
   async function disableDisplayHardware() {
@@ -492,6 +514,7 @@ export function DataSourcesPage() {
         onDisableDisplays={disableDisplayHardware}
         onDisableSensors={disableSensorHardware}
         onSetupSensorPrerequisites={setupSensorHardwarePrerequisites}
+        onSetupDisplayPrerequisites={setupDisplayHardwarePrerequisites}
         onEnableMqtt={enableMqttHardware}
         onDisableMqtt={disableMqttHardware}
         onRefreshHardware={refreshHardwareStatus}

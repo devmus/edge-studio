@@ -3,10 +3,23 @@ import { dependencyUnavailable } from "../../shared/api-error.js";
 import { recordAuditEvent } from "../auth/audit.service.js";
 import { requireRole } from "../auth/auth.middleware.js";
 import { pauseCameraRetention } from "../retention/camera-retention.service.js";
-import { disableHostDisplayCapability, enableHostDisplayCapability } from "./hostCapabilities.service.js";
+import { disableHostDisplayCapability, enableHostDisplayCapability, setupHostDisplayPrerequisites } from "./hostCapabilities.service.js";
 import { disableHostCameraCapability, disableHostGpioCapability, disableHostMqttCapability, disableHostSensorCapability, enableHostCameraCapability, enableHostGpioCapability, enableHostMqttCapability, enableHostSensorCapability, listHostCapabilities, setupHostSensorPrerequisites, type HostCapability } from "./hostCapabilities.service.js";
 
 export const hostCapabilitiesRouter = Router();
+
+hostCapabilitiesRouter.post("/displays/setup-prerequisites", requireRole("admin"), async (req, res) => {
+  try {
+    const result = await setupHostDisplayPrerequisites();
+    recordAuditEvent("host-capability.setup-prerequisites", {
+      userId: req.user?.id,
+      detail: `capability=displays state=${result.capability.state} rebootRequired=${String(result.rebootRequired)}`,
+    });
+    return res.json(result);
+  } catch (error) {
+    return dependencyUnavailable(res, error instanceof Error ? error.message : "Failed to set up SPI prerequisites");
+  }
+});
 
 hostCapabilitiesRouter.post("/displays/enable", requireRole("admin"), async (req, res) => {
   try {
