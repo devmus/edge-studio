@@ -158,7 +158,7 @@ export function DraftBlockInspector({
     );
   }
 
-  if (block.type === "run_custom_code") return <CustomCodeInspector blockId={block.id} config={block.config} sources={sources} onChange={onChange} />;
+  if (block.type === "run_custom_code") return <CustomCodeInspector config={block.config} sources={sources} onChange={onChange} />;
 
   if (block.type === "fetch_data_source") {
     return (

@@ -41,6 +41,16 @@ afterEach(() => {
 });
 
 describe("custom-code runner boundary", () => {
+  it("passes exact historic run/block filters to the helper before list limits", async () => {
+    fetch.mockResolvedValueOnce(Response.json({ items: [job] }));
+    const result = await service.listCustomCodeJobs({ workflowId: owner.workflowId, runId: "run:1", blockId: owner.blockId });
+    expect(result.items).toEqual([job]);
+    const query = new URL(fetch.mock.calls[0][0]).searchParams;
+    expect(Object.fromEntries(query)).toEqual({ workflowId: owner.workflowId, runId: "run:1", blockId: owner.blockId });
+    await expect(service.listCustomCodeJobs({ runId: "x".repeat(101) })).rejects.toThrow(/filter/);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   it("waits for bounded completion and passes structured inputs and only the helper token", async () => {
     const result = await service.runCustomCode({ scriptId: "test-script" }, owner, { lux: 12.5 });
     expect(result.job.result).toEqual({ answer: 42 });

@@ -61,8 +61,15 @@ export async function listCustomScripts() {
   return request<{ items: Script[]; errors: { id: string; error: string }[] }>("/scripts");
 }
 
-export async function listCustomCodeJobs() {
-  return request<{ items: ScriptJob[] }>("/jobs");
+export async function listCustomCodeJobs(filter: { workflowId?: string; runId?: string; blockId?: string } = {}) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(filter)) {
+    if (value !== undefined) {
+      if (!value || value.length > 100) throw new Error("Invalid script-job filter");
+      query.set(key, value);
+    }
+  }
+  return request<{ items: ScriptJob[] }>(`/jobs${query.size ? `?${query}` : ""}`);
 }
 
 export async function getCustomCodeJob(id: string) {

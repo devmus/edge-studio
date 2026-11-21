@@ -19,6 +19,7 @@ import { ErrorAlert } from "../../../components/ErrorAlert";
 import { ErrorDetailPanel } from "../../../components/patterns/ErrorDetailPanel";
 import { normalizeError } from "../../../lib/errors";
 import { AutomationRunInspectModal } from "../AutomationRunInspectModal";
+import { CustomCodeRunJob } from "./CustomCodeRunJob";
 import { ReadDetailsModal } from "../../data-reads/DataReadsHistoryTable";
 import { getDataSourceRead } from "../../data-reads/dataReadsApi";
 import type { DataSourceRead } from "../../data-reads/dataReadTypes";
@@ -457,6 +458,7 @@ function WatchRunCell({
   onSelectRun,
   onOpenRaw,
   onOpenError,
+  onOpenJobs,
 }: {
   columnId: string;
   run: AutomationRun;
@@ -464,6 +466,7 @@ function WatchRunCell({
   onSelectRun: (runId: string) => void;
   onOpenRaw: () => void;
   onOpenError: () => void;
+  onOpenJobs: () => void;
 }) {
   if (columnId === "started") return <TableCell>{formatLocalTime(run.startedAt)}</TableCell>;
   if (columnId === "trigger") return <TableCell>{run.triggerType}</TableCell>;
@@ -501,6 +504,7 @@ function WatchRunCell({
             Raw details
           </Button>
           {run.status === "failed" && <Button type="button" variant="secondary" size="xs" onClick={onOpenError}>Error details</Button>}
+          {run.blocks.some((block) => block.blockType === "run_custom_code") && <Button type="button" variant="secondary" size="xs" onClick={onOpenJobs}>Script jobs</Button>}
         </RowActions>
       </TableCell>
     );
@@ -975,16 +979,6 @@ function DomainBlockResultSummary({
     );
   }
 
-  if (block.type === "run_custom_code" && blockOutput) {
-    const job = contextRecord(blockOutput.job);
-    return <SummaryRows rows={[
-      { label: "Job ID", value: typeof job?.id === "string" ? job.id : "No job" },
-      { label: "Status at this run", value: typeof job?.status === "string" ? job.status : "Unknown" },
-      { label: "Action", value: typeof blockOutput.action === "string" ? blockOutput.action : "Started" },
-      { label: "Script result", value: shortRunValue(job?.result) },
-    ]} />;
-  }
-
   if (block.type === "control_output" && blockOutput) {
     return (
       <SummaryRows
@@ -1013,7 +1007,6 @@ function DomainBlockResultSummary({
 }
 
 function hasDomainBlockResult(block: AutomationBlock, blockRun: AutomationRun["blocks"][number]) {
-  if (block.type === "run_custom_code") return Boolean(contextRecord(nestedOutput(blockRun.output)?.job));
   if (block.type.endsWith("_start") && contextRecord(blockRun.output)) return true;
   if (block.type === "wait") return true;
   if (
@@ -1173,8 +1166,8 @@ export function WatchRuntimeInspector({
           <p className={mutedText}>{skippedBlockMessage}</p>
         ) : blockNotReached ? (
           <p className={mutedText}>{noBlockRunMessage}</p>
-        ) : selectedBlock?.type === "run_custom_code" && latestBlockRun && !hasDomainBlockResult(selectedBlock, latestBlockRun) ? (
-          <p className={mutedText}>No script job was recorded for this block. See error details; older failed runs may not include job information.</p>
+        ) : selectedBlock?.type === "run_custom_code" && latestBlockRun ? (
+          <CustomCodeRunJob key={latestBlockRun.id} blockRun={latestBlockRun} />
         ) : selectedBlock && latestBlockRun && hasDomainBlockResult(selectedBlock, latestBlockRun) ? (
           <div className="gap-detail-next grid">
             <DomainBlockResultSummary block={selectedBlock} blockRun={latestBlockRun} />
@@ -1362,6 +1355,7 @@ export function WatchRunHistory({
                           onSelectRun={onSelectRun}
                           onOpenRaw={() => setRawRunId(run.id)}
                           onOpenError={() => setErrorRun(run)}
+                          onOpenJobs={() => setErrorRun(run)}
                         />
                       ))}
                     </TableRow>
@@ -1407,6 +1401,7 @@ export function WatchRunHistory({
             {selectedRun ? (
               <>
               {selectedRun.status === "failed" && <Button type="button" variant="secondary" size="xs" onClick={() => setErrorRun(selectedRun)}>Error details</Button>}
+              {selectedRun.blocks.some((block) => block.blockType === "run_custom_code") && <Button type="button" variant="secondary" size="xs" onClick={() => setErrorRun(selectedRun)}>Script jobs</Button>}
               <Button
                 type="button"
                 variant="secondary"

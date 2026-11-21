@@ -21,6 +21,11 @@ const getDataSourceRead = vi.hoisted(() => vi.fn());
 vi.mock("../../../../src/features/data-reads/dataReadsApi", () => ({
   getDataSourceRead: (...args: unknown[]) => getDataSourceRead(...args),
 }));
+vi.mock("../../../../src/features/automation/customCodeApi", () => ({
+  getScriptJob: vi.fn().mockRejectedValue(new Error("Runner unavailable")),
+  findScriptJobs: vi.fn().mockResolvedValue({ items: [] }),
+  stopScriptJob: vi.fn(),
+}));
 
 function workflow(overrides: Partial<AutomationWorkflow> = {}): AutomationWorkflow {
   return {
@@ -517,7 +522,7 @@ describe("WatchRuntimeInspector", () => {
     expect(screen.getByRole("dialog")).toHaveTextContent("job-123");
   });
 
-  it("does not present a legacy previous-variable output as a custom-code job result", () => {
+  it("does not present a legacy previous-variable output as a custom-code job result", async () => {
     render(<WatchRuntimeInspector
       selectedBlock={block({ type: "run_custom_code" })}
       latestBlockRun={blockRun({ blockType: "run_custom_code", status: "failed", error: "Script failed", output: { output: { action: "set_variable", name: "lux", value: { value: "12.5" } } } })}
@@ -525,7 +530,7 @@ describe("WatchRuntimeInspector", () => {
     />);
     expect(screen.getAllByText("Script failed")).toHaveLength(1);
     expect(screen.queryByText("set_variable")).not.toBeInTheDocument();
-    expect(screen.getByText(/No script job was recorded/)).toBeInTheDocument();
+    expect(await screen.findByText(/No script job was recorded/)).toBeInTheDocument();
   });
 
   it("shows friendly input and result summaries before raw JSON actions", () => {
@@ -908,6 +913,14 @@ describe("WatchRuntimeInspector", () => {
 });
 
 describe("WatchRunHistory", () => {
+  it("opens script jobs from a successful historic run", async () => {
+    const historyRun = run({ blocks: [blockRun({ blockType: "run_custom_code", blockLabel: "Run code", output: { output: { action: "completed", job: { id: "job-history", status: "success", logs: "Log from this historic run", result: 12.5 } } } })] });
+    render(<WatchRunHistory runs={[historyRun]} selectedRunId={historyRun.id} onSelectRun={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: "Script jobs" }));
+    expect(screen.getByRole("dialog")).toHaveTextContent("Log from this historic run");
+    expect(screen.getByRole("dialog")).toHaveTextContent("job-history");
+  });
+
   it("shows an empty state with no runs", () => {
     render(<WatchRunHistory runs={[]} selectedRunId={null} onSelectRun={vi.fn()} />);
     expect(screen.getByText("No workflow runs recorded yet.")).toBeInTheDocument();

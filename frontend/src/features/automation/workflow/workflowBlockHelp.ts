@@ -41,7 +41,7 @@ export const workflowBlockHelp = {
       { label: "Time limit, seconds", description: "1–3600 seconds. Background jobs may run without a time limit." },
     ],
     configuration: ["Install scripts outside the app checkout under /opt/edge-studio-scripts.", "Select a script, execution mode, inputs and optional display target.", "Installed code is trusted Python, not sandboxed. Modes do not restrict file or network access."],
-    outputs: ["A job ID, status and result in workflow output. Later blocks can read output.job.result through a context variable.", "Job status/logs remain separate from the workflow that started a background job. Pause, archive or delete stops owned jobs; restarts do not automatically resume them."],
+    outputs: ["Inspect run-linked jobs, full logs/results and Stop controls in Watch, or open Script jobs from a historic run. Edit configures scripts only. Later blocks can read output.job.result through a context variable.", "Background jobs show current state separately from the acknowledgement recorded with each run. Keep/Update runs can share a job. Pause, archive or delete stops owned jobs; restarts do not automatically resume them."],
     examples: ["Animate a light-level bar on the PIM576 using an installed Python script."],
   },
   manual_start: {

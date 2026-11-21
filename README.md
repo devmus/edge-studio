@@ -17,7 +17,7 @@ The current prototype contains:
 
 See [supported hardware, devices and workflow blocks](docs/guides/supported-capabilities.md) for the capability catalog, prerequisites, setup guides and recorded verification evidence.
 
-**Run custom code** executes trusted installed Python scripts through an opt-in non-root host service. Select **Wait for completion** or **Run in background**, supply JSON inputs, and inspect results/logs or stop jobs from the block inspector. Background repeat policies keep, restart or update the existing job. Scripts live in `/opt/edge-studio-scripts`, with retained state under `/var/lib/edge-studio-scripts`; app updates do not overwrite user source. The runner is not a Python sandbox and remains disabled by default (`ENABLE_CUSTOM_CODE=true` enables fixed installer setup). See [script setup, lifecycle and LCD animation](docs/guides/custom-code.md).
+**Run custom code** executes trusted installed Python scripts through an opt-in non-root host service. Configure **Wait for completion** or **Run in background** and JSON inputs in Edit; inspect run-linked job status/logs/results and stop live jobs in Watch or a historic run's **Script jobs** details. Background repeat policies keep, restart or update the existing job. Scripts live in `/opt/edge-studio-scripts`, with retained state under `/var/lib/edge-studio-scripts`; app updates do not overwrite user source. The runner is not a Python sandbox and remains disabled by default (`ENABLE_CUSTOM_CODE=true` enables fixed installer setup). See [script setup, lifecycle and LCD animation](docs/guides/custom-code.md).
 
 ## Contribute and request improvements
 

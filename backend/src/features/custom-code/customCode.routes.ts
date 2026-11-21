@@ -10,8 +10,12 @@ customCodeRouter.get("/scripts", async (_req, res) => {
   try { res.json(await listCustomScripts()); }
   catch { dependencyUnavailable(res, "Script helper unavailable. Check the installed-script setup guide and runner service."); }
 });
-customCodeRouter.get("/jobs", async (_req, res) => {
-  try { res.json(await listCustomCodeJobs()); }
+customCodeRouter.get("/jobs", async (req, res) => {
+  try { res.json(await listCustomCodeJobs({
+    workflowId: typeof req.query.workflowId === "string" ? req.query.workflowId : undefined,
+    runId: typeof req.query.runId === "string" ? req.query.runId : undefined,
+    blockId: typeof req.query.blockId === "string" ? req.query.blockId : undefined,
+  })); }
   catch { dependencyUnavailable(res, "Script jobs are unavailable. Check the runner service."); }
 });
 customCodeRouter.get("/jobs/:id", async (req, res) => {

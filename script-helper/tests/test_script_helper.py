@@ -169,6 +169,28 @@ time.sleep(60)
         self.assertEqual(request("/shell", Handler.token, "{}")[0], 404)
         self.assertEqual(request("/run", Handler.token, "x" * 32769)[0], 400)
 
+    def test_http_filters_history_before_the_recent_job_limit(self):
+        for index in range(105):
+            self.runner.save({"id": f"job-{index}", "workflowId": "workflow", "blockId": "block", "runId": f"run-{index}", "status": "success", "logs": "log"})
+        class Handler(helper.Handler):
+            runner = self.runner
+            token = "test-token"
+        server = helper.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        def request(query):
+            connection = http.client.HTTPConnection("127.0.0.1", server.server_port)
+            connection.request("GET", "/jobs" + query, headers={"Authorization": "Bearer test-token"})
+            response = connection.getresponse()
+            data = json.loads(response.read())
+            connection.close()
+            self.assertEqual(response.status, 200)
+            return data["items"]
+        self.assertEqual(len(request("")), 100)
+        self.assertEqual([job["id"] for job in request("?workflowId=workflow&runId=run-0&blockId=block")], ["job-0"])
+        self.assertEqual(request("?runId=run-0&blockId=other-block"), [])
+
 
 if __name__ == "__main__":
     unittest.main()

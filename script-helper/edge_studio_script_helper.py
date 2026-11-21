@@ -13,6 +13,7 @@ import sys
 import threading
 import time
 import urllib.request
+from urllib.parse import parse_qs, urlsplit
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -371,8 +372,13 @@ class Handler(BaseHTTPRequestHandler):
             if self.command == "GET":
                 if self.path == "/scripts":
                     return self.respond(200, self.runner.scripts())
-                if self.path == "/jobs":
-                    return self.respond(200, {"items": [{**job, "logs": job["logs"][-1024:]} for job in self.runner.jobs()[:100]]})
+                if urlsplit(self.path).path == "/jobs":
+                    query = parse_qs(urlsplit(self.path).query)
+                    filters = {key: query[key][0] for key in ("workflowId", "runId", "blockId") if key in query}
+                    if any(not value or len(value) > 100 for value in filters.values()):
+                        raise ValueError("Invalid job filter")
+                    jobs = [job for job in self.runner.jobs() if all(job.get(key) == value for key, value in filters.items())]
+                    return self.respond(200, {"items": [{**job, "logs": job["logs"][-1024:]} for job in jobs[:100]]})
                 if re.fullmatch(r"/jobs/[a-f0-9-]{36}", self.path):
                     return self.respond(200, {"job": self.runner.get(self.path.split("/")[2])})
             else:

@@ -15,13 +15,13 @@ afterEach(() => vi.unstubAllGlobals());
 describe("custom-code block configuration", () => {
   it("discovers scripts, selects modes and supports background repeat/input/time controls", async () => {
     const onChange = vi.fn();
-    const view = render(<CustomCodeInspector blockId="block" config={{ scriptId: "animate-lux" }} sources={[]} onChange={onChange} />);
+    const view = render(<CustomCodeInspector config={{ scriptId: "animate-lux" }} sources={[]} onChange={onChange} />);
     await screen.findByRole("option", { name: "Animate light level" });
     expect(screen.getByRole("combobox", { name: "Execution mode" })).toHaveValue("bounded");
     expect(screen.queryByRole("combobox", { name: "When already running" })).not.toBeInTheDocument();
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "Execution mode" }), "background");
     expect(onChange).toHaveBeenCalledWith({ scriptId: "animate-lux", executionMode: "background", timeoutSeconds: 30 });
-    view.rerender(<CustomCodeInspector blockId="block" config={{ scriptId: "animate-lux", executionMode: "background" }} sources={[]} onChange={onChange} />);
+    view.rerender(<CustomCodeInspector config={{ scriptId: "animate-lux", executionMode: "background" }} sources={[]} onChange={onChange} />);
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "When already running" }), "update");
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ onRunning: "update" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Time limit, seconds" }), { target: { value: "" } });
@@ -30,18 +30,20 @@ describe("custom-code block configuration", () => {
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ inputsJsonText: '{"lux":"{{lux}}"}' }));
   });
 
-  it("shows running jobs, stops explicitly and refreshes discovery", async () => {
-    render(<CustomCodeInspector blockId="block" config={{}} sources={[]} onChange={vi.fn()} />);
-    await userEvent.click(await screen.findByRole("button", { name: "Stop job" }));
-    await waitFor(() => expect(fetch.mock.calls.some(([url, init]) => url === "/api/custom-code/jobs/job-1/stop" && init?.method === "POST")).toBe(true));
+  it("keeps Edit configuration-only and refreshes discovery without loading jobs", async () => {
+    render(<CustomCodeInspector config={{}} sources={[]} onChange={vi.fn()} />);
+    await screen.findByRole("option", { name: "Animate light level" });
+    expect(screen.queryByRole("button", { name: "Stop job" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Logs and result")).not.toBeInTheDocument();
     const previous = fetch.mock.calls.length;
     await userEvent.click(screen.getByRole("button", { name: "Refresh scripts" }));
     await waitFor(() => expect(fetch.mock.calls.length).toBeGreaterThan(previous));
+    expect(fetch.mock.calls.every(([url]) => url === "/api/custom-code/scripts")).toBe(true);
   });
 
   it("preserves a missing selection and explains unavailable support", async () => {
     fetch.mockRejectedValue(new TypeError("Failed to fetch"));
-    render(<CustomCodeInspector blockId="block" config={{ scriptId: "missing" }} sources={[]} onChange={vi.fn()} />);
+    render(<CustomCodeInspector config={{ scriptId: "missing" }} sources={[]} onChange={vi.fn()} />);
     expect(await screen.findByRole("alert")).toHaveTextContent("Custom code is unavailable");
     expect(screen.getByRole("combobox", { name: "Script" })).toHaveValue("missing");
   });

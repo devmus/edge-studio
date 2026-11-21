@@ -3,6 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AutomationRunInspectModal } from "../../../src/features/automation/AutomationRunInspectModal";
 import type { AutomationBlockRun, AutomationRun } from "../../../src/features/automation/automationTypes";
+vi.mock("../../../src/features/automation/customCodeApi", () => ({
+  getScriptJob: vi.fn().mockRejectedValue(new Error("Runner unavailable")),
+  findScriptJobs: vi.fn().mockResolvedValue({ items: [] }),
+  stopScriptJob: vi.fn(),
+}));
 
 function blockRun(overrides: Partial<AutomationBlockRun> = {}): AutomationBlockRun {
   return {
@@ -48,10 +53,10 @@ describe("AutomationRunInspectModal", () => {
     render(<AutomationRunInspectModal run={run({ status: "failed", error: "Custom script failed", blocks: [blockRun({
       status: "failed", blockType: "run_custom_code", error: "Custom script failed",
       errorDetails: { domain: "block", type: "block_failed", message: "Custom script failed", nativeMessage: "TypeError: expected a number" },
-      output: { output: { action: "failed", job: { id: "job-123", exitCode: 1, logs: "first log line\nTypeError: expected a number" } } },
+      output: { output: { action: "failed", job: { id: "job-123", status: "failed", exitCode: 1, logs: "first log line\nTypeError: expected a number" } } },
     })] })} onClose={() => {}} />);
-    expect(screen.getByText("Script job and logs")).toBeInTheDocument();
-    await userEvent.click(screen.getByText("Script job and logs"));
+    expect(screen.getByText("Script jobs")).toBeInTheDocument();
+    await screen.findByText(/Showing the job snapshot/);
     expect(screen.getByRole("dialog")).toHaveTextContent("first log line");
     expect(screen.getByRole("dialog")).toHaveTextContent("job-123");
     expect(screen.getByRole("dialog")).toHaveTextContent("TypeError: expected a number");

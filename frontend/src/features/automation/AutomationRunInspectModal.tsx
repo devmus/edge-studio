@@ -7,6 +7,7 @@ import { Pill } from "../../components/ui/Pill";
 import { formatLocalDateTime } from "../../lib/time";
 import { formatRunDuration, RUN_STATUS } from "./automationRunDisplay";
 import type { AutomationRun } from "./automationTypes";
+import { CustomCodeRunJob } from "./workflow/CustomCodeRunJob";
 
 /** Prefer the run-level error; if missing, fall back to the first failed block's error. */
 function primaryInspectError(run: AutomationRun) {
@@ -28,6 +29,7 @@ export function AutomationRunInspectModal({
   const failedBlock = failedBlocks[0];
   const successBlocks = run.blocks.filter((block) => block.status === "success").length;
   const status = RUN_STATUS[run.status];
+  const scriptBlocks = run.blocks.filter((block) => block.blockType === "run_custom_code");
 
   return (
     <Modal title={`${run.workflowName} workflow`} onClose={onClose}>
@@ -59,16 +61,12 @@ export function AutomationRunInspectModal({
             <div className="border-stroke-secondary divide-stroke-secondary flex flex-col divide-y">
               {failedBlocks.map((block) => {
                 const blockError = block.errorDetails ?? block.error;
-                const job = block.blockType === "run_custom_code"
-                  ? (block.output as { output?: { job?: unknown } } | null)?.output?.job
-                  : undefined;
                 return blockError ? (
                   <div
                     key={block.id}
                     className="py-pad-close flex flex-col first:pt-0 last:pb-0"
                   >
                     <ErrorDetailPanel error={blockError} />
-                    {job ? <Disclosure title="Script job and logs"><JsonPreviewContent value={job} /></Disclosure> : null}
                   </div>
                 ) : null;
               })}
@@ -76,6 +74,12 @@ export function AutomationRunInspectModal({
           </Disclosure>
         ) : null}
 
+        {scriptBlocks.length > 0 && <Disclosure title="Script jobs">
+          {scriptBlocks.map((block) => <div key={block.id} className="gap-detail-next grid py-pad-close">
+            <strong>{block.blockLabel}</strong>
+            <CustomCodeRunJob key={block.id} blockRun={block} />
+          </div>)}
+        </Disclosure>}
         <Disclosure title="Run data">
           <JsonPreviewContent value={run} />
         </Disclosure>
