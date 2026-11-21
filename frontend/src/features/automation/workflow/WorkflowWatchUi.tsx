@@ -15,6 +15,10 @@ import {
 import { JsonPreview, JsonPreviewContent } from "../../../components/JsonPreview";
 import { Modal } from "../../../components/ui/Modal";
 import { Disclosure } from "../../../components/ui/Disclosure";
+import { ErrorAlert } from "../../../components/ErrorAlert";
+import { ErrorDetailPanel } from "../../../components/patterns/ErrorDetailPanel";
+import { normalizeError } from "../../../lib/errors";
+import { AutomationRunInspectModal } from "../AutomationRunInspectModal";
 import { ReadDetailsModal } from "../../data-reads/DataReadsHistoryTable";
 import { getDataSourceRead } from "../../data-reads/dataReadsApi";
 import type { DataSourceRead } from "../../data-reads/dataReadTypes";
@@ -452,12 +456,14 @@ function WatchRunCell({
   selectedRunId,
   onSelectRun,
   onOpenRaw,
+  onOpenError,
 }: {
   columnId: string;
   run: AutomationRun;
   selectedRunId: string | null;
   onSelectRun: (runId: string) => void;
   onOpenRaw: () => void;
+  onOpenError: () => void;
 }) {
   if (columnId === "started") return <TableCell>{formatLocalTime(run.startedAt)}</TableCell>;
   if (columnId === "trigger") return <TableCell>{run.triggerType}</TableCell>;
@@ -494,6 +500,7 @@ function WatchRunCell({
           <Button type="button" variant="secondary" size="xs" onClick={onOpenRaw}>
             Raw details
           </Button>
+          {run.status === "failed" && <Button type="button" variant="secondary" size="xs" onClick={onOpenError}>Error details</Button>}
         </RowActions>
       </TableCell>
     );
@@ -1006,6 +1013,7 @@ function DomainBlockResultSummary({
 }
 
 function hasDomainBlockResult(block: AutomationBlock, blockRun: AutomationRun["blocks"][number]) {
+  if (block.type === "run_custom_code") return Boolean(contextRecord(nestedOutput(blockRun.output)?.job));
   if (block.type.endsWith("_start") && contextRecord(blockRun.output)) return true;
   if (block.type === "wait") return true;
   if (
@@ -1020,7 +1028,6 @@ function hasDomainBlockResult(block: AutomationBlock, blockRun: AutomationRun["b
       block.type === "if_payload_field_equals" ||
       block.type === "set_variable" ||
       block.type === "control_output" ||
-      block.type === "run_custom_code" ||
       block.type === "send_transaction") &&
     nestedOutput(blockRun.output)
   ) return true;
@@ -1046,6 +1053,9 @@ export function WatchRuntimeInspector({
   const [readDetails, setReadDetails] = useState<DataSourceRead | null>(null);
   const [readDetailsLoading, setReadDetailsLoading] = useState(false);
   const [readDetailsError, setReadDetailsError] = useState<string | null>(null);
+  const [inspectedError, setInspectedError] = useState<{ error: unknown; run?: AutomationRun } | null>(null);
+  const error = latestBlockRun?.errorDetails ?? latestBlockRun?.error ?? selectedRun?.errorDetails ?? selectedRun?.error
+    ?? (!selectedRun && !latestBlockRun ? selectedBlock?.lastErrorDetails ?? selectedBlock?.lastError : null);
   const blockWasSkipped = latestBlockRun?.status === "skipped";
   const blockNotReached = Boolean(selectedBlock && selectedRun && !latestBlockRun);
   const blockStoppedBeforeRun = blockNotReached && selectedRun?.status === "failed";
@@ -1094,7 +1104,6 @@ export function WatchRuntimeInspector({
             No run selected yet. Run the workflow or choose a historic run below.
           </p>
         )}
-        {selectedRun?.error && <p className={errorText}>{selectedRun.error}</p>}
       </InspectorSection>
       <InspectorSection
         title="Block status"
@@ -1118,11 +1127,12 @@ export function WatchRuntimeInspector({
                 value={latestBlockRun ? formatDuration(latestBlockRun.durationMs) : "No timing"}
               />
             </div>
-            {selectedBlock.lastError && <p className={errorText}>{selectedBlock.lastError}</p>}
-            {latestBlockRun?.error && <p className={errorText}>{latestBlockRun.error}</p>}
           </>
         )}
       </InspectorSection>
+      {error ? <ErrorAlert action={<Button type="button" variant="secondary" size="sm" onClick={() => setInspectedError({ error, run: selectedRun })}>View error details</Button>}>
+        {normalizeError(error).message}
+      </ErrorAlert> : null}
       <InspectorSection
         title="Input"
         description="Data this block received during the selected run."
@@ -1163,6 +1173,8 @@ export function WatchRuntimeInspector({
           <p className={mutedText}>{skippedBlockMessage}</p>
         ) : blockNotReached ? (
           <p className={mutedText}>{noBlockRunMessage}</p>
+        ) : selectedBlock?.type === "run_custom_code" && latestBlockRun && !hasDomainBlockResult(selectedBlock, latestBlockRun) ? (
+          <p className={mutedText}>No script job was recorded for this block. See error details; older failed runs may not include job information.</p>
         ) : selectedBlock && latestBlockRun && hasDomainBlockResult(selectedBlock, latestBlockRun) ? (
           <div className="gap-detail-next grid">
             <DomainBlockResultSummary block={selectedBlock} blockRun={latestBlockRun} />
@@ -1236,6 +1248,8 @@ export function WatchRuntimeInspector({
       {readDetails ? (
         <ReadDetailsModal item={readDetails} onClose={() => setReadDetails(null)} />
       ) : null}
+      {inspectedError?.run ? <AutomationRunInspectModal run={inspectedError.run} onClose={() => setInspectedError(null)} />
+        : inspectedError ? <Modal title="Block error" onClose={() => setInspectedError(null)}><ErrorDetailPanel error={inspectedError.error} /></Modal> : null}
     </div>
   );
 }
@@ -1252,6 +1266,7 @@ export function WatchRunHistory({
   onSelectRun: (runId: string) => void;
 }) {
   const [rawRunId, setRawRunId] = useState<string | null>(null);
+  const [errorRun, setErrorRun] = useState<AutomationRun | null>(null);
   const [expanded, setExpanded] = useState(false);
   const selectedRun = runs.find((run) => run.id === selectedRunId) ?? runs[0];
   const selectedRunIndex = selectedRun ? runs.findIndex((run) => run.id === selectedRun.id) : -1;
@@ -1346,6 +1361,7 @@ export function WatchRunHistory({
                           selectedRunId={selectedRunId}
                           onSelectRun={onSelectRun}
                           onOpenRaw={() => setRawRunId(run.id)}
+                          onOpenError={() => setErrorRun(run)}
                         />
                       ))}
                     </TableRow>
@@ -1389,6 +1405,8 @@ export function WatchRunHistory({
               ) : null}
             </div>
             {selectedRun ? (
+              <>
+              {selectedRun.status === "failed" && <Button type="button" variant="secondary" size="xs" onClick={() => setErrorRun(selectedRun)}>Error details</Button>}
               <Button
                 type="button"
                 variant="secondary"
@@ -1397,6 +1415,7 @@ export function WatchRunHistory({
               >
                 Raw details
               </Button>
+              </>
             ) : null}
           </div>
           {selectedRun ? (
@@ -1418,6 +1437,7 @@ export function WatchRunHistory({
           <JsonPreviewContent value={rawRunForModal} />
         </Modal>
       ) : null}
+      {errorRun ? <AutomationRunInspectModal run={errorRun} onClose={() => setErrorRun(null)} /> : null}
     </Panel>
   );
 }

@@ -44,6 +44,19 @@ function run(overrides: Partial<AutomationRun> = {}): AutomationRun {
 }
 
 describe("AutomationRunInspectModal", () => {
+  it("includes the preserved script job and complete logs in failed-run details", async () => {
+    render(<AutomationRunInspectModal run={run({ status: "failed", error: "Custom script failed", blocks: [blockRun({
+      status: "failed", blockType: "run_custom_code", error: "Custom script failed",
+      errorDetails: { domain: "block", type: "block_failed", message: "Custom script failed", nativeMessage: "TypeError: expected a number" },
+      output: { output: { action: "failed", job: { id: "job-123", exitCode: 1, logs: "first log line\nTypeError: expected a number" } } },
+    })] })} onClose={() => {}} />);
+    expect(screen.getByText("Script job and logs")).toBeInTheDocument();
+    await userEvent.click(screen.getByText("Script job and logs"));
+    expect(screen.getByRole("dialog")).toHaveTextContent("first log line");
+    expect(screen.getByRole("dialog")).toHaveTextContent("job-123");
+    expect(screen.getByRole("dialog")).toHaveTextContent("TypeError: expected a number");
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
   });

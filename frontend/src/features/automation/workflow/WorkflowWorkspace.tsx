@@ -68,6 +68,7 @@ import {
 } from "./workflowWorkspaceUi";
 import { ArrowLeftIcon, Eye, Pencil } from "lucide-react";
 import { SpinnerAlt } from "../../../components/ui/SpinnerAlt";
+import { AutomationRunInspectModal } from "../AutomationRunInspectModal";
 
 const workflowToggleBaseClass =
   "group h-10 gap-detail-next rounded-full px-detail-next type-body-em disabled:cursor-not-allowed disabled:opacity-60";
@@ -133,6 +134,7 @@ export function WorkflowWorkspace({
     JSON.stringify(examplePayload(workflow), null, 2),
   );
   const [payloadError, setPayloadError] = useState<string | null>(null);
+  const [errorRun, setErrorRun] = useState<AutomationRun | null>(null);
   const [workflowName, setWorkflowName] = useState(workflow.name);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [followLiveRuns, setFollowLiveRuns] = useState(false);
@@ -578,7 +580,7 @@ export function WorkflowWorkspace({
         </>
       }
       notices={
-        mode === "edit" || workflow.archived || workflow.lastError ? (
+        mode === "edit" || workflow.archived || selectedRun?.error ? (
           <>
             {mode === "edit" ? (
               <Text.Body
@@ -593,11 +595,12 @@ export function WorkflowWorkspace({
                 Archived workflows do not run automatically or manually until restored.
               </p>
             )}
-            {workflow.lastError ? (
+            {mode === "edit" && workflow.lastError ? (
               <p className={errorText} role="alert">
                 Last run failed: {workflow.lastError}
               </p>
             ) : null}
+            {mode === "watch" && selectedRun?.error ? <Button type="button" variant="secondary" size="sm" onClick={() => setErrorRun(selectedRun)}>View selected run error</Button> : null}
           </>
         ) : undefined
       }
@@ -873,6 +876,7 @@ export function WorkflowWorkspace({
         ) : undefined
       }
     />
+    {errorRun ? <AutomationRunInspectModal run={errorRun} onClose={() => setErrorRun(null)} /> : null}
     {pendingEditAction ? (
       <Modal
         title="Editing will pause this workflow."

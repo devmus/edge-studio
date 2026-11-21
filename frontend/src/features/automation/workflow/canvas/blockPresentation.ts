@@ -47,17 +47,18 @@ export function blockPresentation(
   }
   // Only surface Disabled — Enabled is the default and would noise every card.
   if (block.enabled === false) badges.push({ label: "Disabled", tone: "neutral", alert: true });
-  if (mode !== "edit" && block.lastRunAt)
+  if (mode !== "edit" && mode !== "watch" && block.lastRunAt)
     badges.push({ label: `Ran ${new Date(block.lastRunAt).toLocaleString()}` });
-  if (mode !== "edit" && block.lastError) badges.push({ label: "Error", tone: "error", alert: true });
+  if (mode !== "edit" && mode !== "watch" && block.lastError) badges.push({ label: "Error", tone: "error", alert: true });
   if (runtime)
     badges.push({
       label:
         runtime.durationMs === null
           ? runtime.status
           : `${runtime.status} · ${formatDuration(runtime.durationMs)}`,
+      ...(runtime.status === "failed" ? { tone: "error" as const, alert: true } : {}),
     });
-  if (runtime?.error) badges.push({ label: "Run error", tone: "error", alert: true });
+  if (runtime?.error && runtime.status !== "failed") badges.push({ label: "Run error", tone: "error", alert: true });
 
   return {
     title: draftBlockTitle(block),

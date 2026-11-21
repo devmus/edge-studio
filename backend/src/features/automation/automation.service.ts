@@ -1,5 +1,5 @@
 import fs from "node:fs/promises";
-import { runCustomCode, type CustomCodeConfig } from "../custom-code/customCode.service.js";
+import { CustomCodeJobError, runCustomCode, type CustomCodeConfig } from "../custom-code/customCode.service.js";
 import { db } from "../../db/database.js";
 import { conditionBaselineKey, evaluateNumericChange, type PendingConditionBaseline } from "./automationConditions.js";
 import {
@@ -321,8 +321,9 @@ export async function executeWorkflow(
   } catch (error) {
     const details = workflowError({
       type: "block_failed",
-      ...errorFromUnknown(error, "Automation workflow failed", { workflowId: latestWorkflow.id }),
+      ...errorFromUnknown(error, "Automation workflow failed", { workflowId: latestWorkflow.id, ...(error instanceof CustomCodeJobError ? error.context : {}) }),
       message: error instanceof Error ? error.message : "Automation workflow failed",
+      ...(error instanceof CustomCodeJobError ? { nativeMessage: error.nativeMessage } : {}),
     });
     const updatedWorkflow = updateAutomationRunError(latestWorkflow.id, details, {
       hash: context.hash ?? null,
@@ -511,6 +512,7 @@ async function executeBlock(
       finishAutomationBlockRun(blockRun.id, { status: "success", output: contextSummary(context) });
       return;
     }
+    if (block.type === "run_custom_code") context.output = null;
     if (isPrivilegedAutomationBlock(block.type)) {
       const limit = Math.min(context.budgetLimit, workflowRunBudgetLimit(listAutomationBlocks(workflow.id).filter((item) => item.enabled), (id) => getDataSource(id)?.type));
       if (context.budgetReserved && limit < context.budgetLimit) throw new Error("Workflow action policy changed during the run; retry with the updated configuration");
@@ -538,6 +540,7 @@ async function executeBlock(
     finishAutomationBlockRun(blockRun.id, { status, output: contextSummary(context) });
     return;
   } catch (error) {
+    if (error instanceof CustomCodeJobError) context.output = { action: "failed", job: error.job };
     const details = blockError({
       type: blockErrorType(block.type, error),
       ...errorFromUnknown(error, "Block failed", {
@@ -545,8 +548,10 @@ async function executeBlock(
         blockId: block.id,
         blockType: block.type,
         blockLabel: blockLabel(block.type),
+        ...(error instanceof CustomCodeJobError ? error.context : {}),
       }),
       message: friendlyBlockErrorMessage(block.type, error),
+      ...(error instanceof CustomCodeJobError ? { nativeMessage: error.nativeMessage } : {}),
     });
     updateAutomationBlockRun(block.id, { error: details });
     finishAutomationBlockRun(blockRun.id, {

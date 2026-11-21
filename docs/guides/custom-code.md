@@ -123,6 +123,10 @@ Enable SPI displays separately, install the bundled `animate-lux` example, and t
 {"lux":"{{lux}}","durationSeconds":5}
 ```
 
+In Set variable, **Custom JSON is the value itself**: enter `12.5`, not `{"value":"12.5"}`. The latter stores an object, which the example cannot convert to a numeric lux reading. If you see “unknown variable: lux”, check the exact variable name and that the enabled Set variable block comes before Run custom code. When viewing history, use **Show on canvas** for the run you want; Follow latest run controls whether newer runs replace that selection.
+
+For failures, use **View error details** in the selected block, **View selected run error** above the canvas, or **Error details** in history. These open the existing workflow error modal. New failed custom-code runs retain the job ID, exit status, result and full retained logs under **Block errors → Script job and logs**, with the native error in structured details. Older failed runs may lack a stored job; their previous block output is not treated as a script result. On older builds, the code block's edit inspector still exposes retained jobs under **Logs and result**; its list shows a log tail, while the authenticated job-detail API exposes full retained logs.
+
 For a continuous animation, select Run in background, blank time limit, Update inputs and `{"lux":"{{lux}}","durationSeconds":null}`. The script reads new lux values without restarting the animation. Use a suitable sensor trigger/schedule; one-second triggers reaching custom code exhaust 1,000/hour, so use at least a five-second schedule or change filtering. Check the job and stop/pause deliberately.
 
 Physical verification remains required: visible animation/rotation, text-busy handling, repeated updates, stop/release, runner/backend restart, pause/delete, resource use on the actual Pi and dependency/service repair. Record model/OS, expected/installed SHA, container/service health and sanitized evidence. No actual Pi deployment or display action is implied by the examples.

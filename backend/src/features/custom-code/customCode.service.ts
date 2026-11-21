@@ -15,7 +15,19 @@ export type CustomCodeConfig = {
   targetId?: string;
 };
 export type Script = { id: string; name: string; capabilities: string[] };
-export type ScriptJob = { id: string; workflowId: string; blockId: string; scriptId: string; mode: string; status: string; logs: string; result: unknown; error: string | null };
+export type ScriptJob = { id: string; workflowId: string; blockId: string; scriptId: string; mode: string; status: string; logs: string; result: unknown; error: string | null; exitCode?: number | null };
+
+export class CustomCodeJobError extends Error {
+  readonly code = "CUSTOM_CODE_FAILED";
+  readonly nativeMessage: string;
+  readonly context: Record<string, unknown>;
+
+  constructor(readonly job: ScriptJob) {
+    super(`Custom script ${job.status}: ${job.error ?? "check job logs"}`);
+    this.nativeMessage = job.logs.trim().split("\n").filter((line) => line.trim()).at(-1)?.slice(0, 2048) || job.error || this.message;
+    this.context = { jobId: job.id, scriptId: job.scriptId, jobStatus: job.status, exitCode: job.exitCode ?? null };
+  }
+}
 
 const session = crypto.randomUUID();
 let initialized: Promise<unknown> | null = null;
@@ -130,7 +142,7 @@ export async function runCustomCode(config: CustomCodeConfig, owner: { workflowI
         throw new Error("Workflow or script block changed during execution");
       }
     }
-    if (job.status !== "success") throw new Error(`Custom script ${job.status}: ${job.error ?? "check job logs"}`);
+    if (job.status !== "success") throw new CustomCodeJobError(job);
     return { job, action: "completed" };
   } finally {
     boundedOwners.delete(key);

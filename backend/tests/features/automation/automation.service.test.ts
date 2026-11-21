@@ -541,6 +541,48 @@ describe("automation.service — if_payload_field_equals", () => {
 });
 
 describe("automation.service — set_variable", () => {
+  it("preserves a failed custom-code job and its native error instead of the previous variable result", async () => {
+    const env = (await import("../../../src/config/env.js")).env;
+    const saved = { enabled: env.customCodeEnabled, token: env.scriptHelperToken };
+    env.customCodeEnabled = true;
+    env.scriptHelperToken = "test-runner-token";
+    const nativeMessage = "TypeError: float() argument must be a string or a real number, not 'dict'";
+    const job = { id: "11111111-1111-4111-8111-111111111111", scriptId: "animate-lux", status: "failed", result: null, logs: `Traceback (most recent call last):\n${nativeMessage}\n`, error: "Script failed", exitCode: 1 };
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => Response.json(url.endsWith("/scripts")
+      ? { items: [{ id: "animate-lux", name: "Animation", capabilities: [] }], errors: [] }
+      : url.endsWith("/run") ? { job, action: "started" } : { ok: true })));
+    try {
+      const wf = makeWorkflow([
+        { type: "manual_start", config: {} },
+        { type: "set_variable", config: { variableName: "lux", variableSource: "custom_json", valueJsonText: '{"value":"12.5"}' } },
+        { type: "run_custom_code", config: { scriptId: "animate-lux", inputsJsonText: '{"lux":"{{lux}}"}' } },
+      ]);
+      await assert.rejects(service.runAutomationWorkflow(wf.id), /Custom script failed/);
+      const run = service.listSerializedAutomationRunsForWorkflow(wf.id)[0];
+      const output = run.blocks[2].output as { output: { action: string; job: typeof job } };
+      assert.equal(output.output.action, "failed");
+      assert.equal(output.output.job.id, job.id);
+      assert.equal(output.output.job.logs, job.logs);
+      assert.equal(run.blocks[2].errorDetails?.nativeMessage, nativeMessage);
+      assert.equal(run.errorDetails?.context?.jobId, job.id);
+    } finally {
+      env.customCodeEnabled = saved.enabled;
+      env.scriptHelperToken = saved.token;
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("does not record a previous block's output when script interpolation fails before starting a job", async () => {
+    const wf = makeWorkflow([
+      { type: "manual_start", config: {} },
+      { type: "set_variable", config: { variableName: "lux", variableSource: "custom_json", valueJsonText: "12.5" } },
+      { type: "run_custom_code", config: { scriptId: "animate-lux", inputsJsonText: '{"lux":"{{missing}}"}' } },
+    ]);
+    await assert.rejects(service.runAutomationWorkflow(wf.id), /unknown variable/);
+    const run = service.listSerializedAutomationRunsForWorkflow(wf.id)[0];
+    assert.equal((run.blocks[2].output as { output: unknown }).output, null);
+  });
+
   it("runs installed code through the real client, budgets it and exposes its result to later blocks", async () => {
     const env = (await import("../../../src/config/env.js")).env;
     const saved = { enabled: env.customCodeEnabled, token: env.scriptHelperToken };

@@ -183,7 +183,7 @@ describe("blockPresentation: blockPresentation", () => {
     expect(watchPresentation.badges).toEqual(expect.arrayContaining([{ label: "success · 250 ms" }]));
   });
 
-  it("adds a runtime status badge with duration, and a run-error badge on runtime failure", () => {
+  it("shows one failed runtime badge without duplicate or latest-state errors in watch mode", () => {
     const running = blockPresentation(draft(), [], [], [], { status: "running", durationMs: null });
     expect(running.badges).toEqual(expect.arrayContaining([{ label: "running" }]));
 
@@ -193,14 +193,12 @@ describe("blockPresentation: blockPresentation", () => {
     const slowSuccess = blockPresentation(draft(), [], [], [], { status: "success", durationMs: 1200 });
     expect(slowSuccess.badges).toEqual(expect.arrayContaining([{ label: "success · 1.2 s" }]));
 
-    const failed = blockPresentation(draft(), [], [], [], {
+    const failed = blockPresentation(draft({ lastError: "newer failure", lastRunAt: "2026-08-01T00:00:00.000Z" }), [], [], [], {
       status: "failed",
       durationMs: 10,
       error: "boom",
-    });
-    expect(failed.badges).toEqual(
-      expect.arrayContaining([{ label: "Run error", tone: "error", alert: true }]),
-    );
+    }, "watch");
+    expect(failed.badges).toEqual([{ label: "failed · 10 ms", tone: "error", alert: true }]);
 
     expect(blockPresentation(draft(), [], [], [], { status: "skipped", durationMs: 1 }).className).toMatch(
       /opacity-80/,

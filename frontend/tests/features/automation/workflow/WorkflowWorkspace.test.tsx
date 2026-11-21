@@ -219,6 +219,19 @@ afterEach(() => {
 });
 
 describe("WorkflowWorkspace edit mode", () => {
+  it("opens the selected historical run's error instead of showing the workflow's latest error", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderWorkspace({ mode: "watch", initialRunId: "older", workflow: workflow({ lastError: "Latest unrelated failure" }), runs: [
+      run({ id: "newer", status: "failed", error: "Latest unrelated failure" }),
+      run({ id: "older", status: "failed", error: "Selected historical failure" }),
+    ] });
+    await waitFor(() => expect(screen.getByRole("button", { name: "View selected run error" })).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: "View selected run error" }));
+    expect(screen.getByRole("dialog")).toHaveTextContent("Selected historical failure");
+    expect(screen.getByRole("dialog")).not.toHaveTextContent("Latest unrelated failure");
+    expect(screen.queryByText("Last run failed: Latest unrelated failure")).not.toBeInTheDocument();
+  });
+
   it("shows a required-name error and saves the trimmed name on blur", async () => {
     const onUpdateWorkflow = vi.fn();
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });

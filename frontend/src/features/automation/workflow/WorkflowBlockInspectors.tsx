@@ -267,6 +267,7 @@ export function DraftBlockInspector({
         {variableSource === "custom_json" ? (
           <TextareaField
             label="Custom JSON"
+            description={'Enter the value itself: 12.5 for a number, "Hello" for text, or an object when you need an object. {"value":"12.5"} stores an object, not the number 12.5.'}
             rows={5}
             value={block.config.valueJsonText ?? '"Button pressed"'}
             onChange={(event) =>

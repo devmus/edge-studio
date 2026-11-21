@@ -501,17 +501,31 @@ describe("WatchRuntimeInspector", () => {
     expect(screen.getByText("No run details")).toBeInTheDocument();
   });
 
-  it("shows block run status, duration, and errors", () => {
+  it("shows only the selected block-run error and opens its structured details", async () => {
     render(
       <WatchRuntimeInspector
         selectedBlock={block({ lastError: "block boom" })}
-        latestBlockRun={blockRun({ status: "failed", error: "run boom" })}
+        latestBlockRun={blockRun({ status: "failed", error: "run boom", errorDetails: { domain: "block", type: "custom_code_failed", message: "run boom", nativeMessage: "TypeError: expected a number", context: { jobId: "job-123" } } })}
         selectedRun={undefined}
       />,
     );
     expect(screen.getByText("failed")).toBeInTheDocument();
-    expect(screen.getByText("block boom")).toBeInTheDocument();
+    expect(screen.queryByText("block boom")).not.toBeInTheDocument();
     expect(screen.getByText("run boom")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "View error details" }));
+    expect(screen.getByRole("dialog")).toHaveTextContent("TypeError: expected a number");
+    expect(screen.getByRole("dialog")).toHaveTextContent("job-123");
+  });
+
+  it("does not present a legacy previous-variable output as a custom-code job result", () => {
+    render(<WatchRuntimeInspector
+      selectedBlock={block({ type: "run_custom_code" })}
+      latestBlockRun={blockRun({ blockType: "run_custom_code", status: "failed", error: "Script failed", output: { output: { action: "set_variable", name: "lux", value: { value: "12.5" } } } })}
+      selectedRun={run({ status: "failed", error: "Script failed" })}
+    />);
+    expect(screen.getAllByText("Script failed")).toHaveLength(1);
+    expect(screen.queryByText("set_variable")).not.toBeInTheDocument();
+    expect(screen.getByText(/No script job was recorded/)).toBeInTheDocument();
   });
 
   it("shows friendly input and result summaries before raw JSON actions", () => {

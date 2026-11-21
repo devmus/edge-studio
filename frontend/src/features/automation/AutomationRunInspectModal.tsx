@@ -59,12 +59,16 @@ export function AutomationRunInspectModal({
             <div className="border-stroke-secondary divide-stroke-secondary flex flex-col divide-y">
               {failedBlocks.map((block) => {
                 const blockError = block.errorDetails ?? block.error;
+                const job = block.blockType === "run_custom_code"
+                  ? (block.output as { output?: { job?: unknown } } | null)?.output?.job
+                  : undefined;
                 return blockError ? (
                   <div
                     key={block.id}
                     className="py-pad-close flex flex-col first:pt-0 last:pb-0"
                   >
                     <ErrorDetailPanel error={blockError} />
+                    {job ? <Disclosure title="Script job and logs"><JsonPreviewContent value={job} /></Disclosure> : null}
                   </div>
                 ) : null;
               })}
