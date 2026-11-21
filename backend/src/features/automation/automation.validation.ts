@@ -1,4 +1,5 @@
 import { env } from "../../config/env.js";
+import { customCodeConfigError, listCustomScripts, type CustomCodeConfig } from "../custom-code/customCode.service.js";
 import { getAddressBookEntryById } from "../address-book/address-book.repository.js";
 import { getCameraCapability } from "../data-sources/cameraCapture.service.js";
 import { getDisplayCapability } from "../data-sources/displayOutput.service.js";
@@ -41,7 +42,7 @@ type ValidationBlock = {
   config: BlockConfig;
 };
 
-export type BlockConfig = {
+export type BlockConfig = CustomCodeConfig & {
   intervalSeconds?: number;
   sourceId?: string;
   targetId?: string;
@@ -141,6 +142,18 @@ async function validateAutomationBlockGraph(blocks: ValidationBlock[]): Promise<
     const config = block.config;
 
     validateBlockReference(block, config, issues, hardwareCapabilities);
+    if (block.type === "run_custom_code") {
+      const error = customCodeConfigError(config);
+      if (error) addIssue(issues, "error", "custom_code.invalid_config", error, block);
+      else if (!env.customCodeEnabled) addIssue(issues, "error", "custom_code.disabled", "Custom code is disabled. Follow the installed-script setup guide.", block);
+      else {
+        try {
+          const script = (await listCustomScripts()).items.find((item) => item.id === config.scriptId);
+          if (!script) addIssue(issues, "error", "custom_code.missing_script", "Installed script is missing or invalid.", block);
+          else if (script.capabilities.includes("display") && (!env.displaysEnabled || !config.targetId || getDataSource(config.targetId)?.type !== "spi-display")) addIssue(issues, "error", "custom_code.missing_display", "Script requires enabled SPI displays and a PIM576 target.", block);
+        } catch { addIssue(issues, "error", "custom_code.unavailable", "Script runner is unavailable.", block); }
+      }
+    }
     if (block.type === "schedule_start" && (typeof config.intervalSeconds !== "number" || !Number.isFinite(config.intervalSeconds) || config.intervalSeconds < 1)) {
       addIssue(issues, "error", "schedule.invalid_interval", "Schedule interval must be a finite number of at least 1 second.", block);
     }

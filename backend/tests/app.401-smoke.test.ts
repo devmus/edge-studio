@@ -49,6 +49,7 @@ const protectedPrefixes = [
   "/api/data-sources",
   "/api/data-reads",
   "/api/automation",
+  "/api/custom-code",
   "/api/feedback",
   "/api/wallet",
   "/api/wallet/address-book",
@@ -61,6 +62,10 @@ const protectedPrefixes = [
 // asymmetric on the same primitives (health vs. read, resync/config vs. peers/add), and the
 // failure mode is a new route quietly shipping ungated.
 const adminOnlyRoutes: [method: "get" | "post" | "patch" | "delete", path: string][] = [
+  ["get", "/api/custom-code/scripts"],
+  ["get", "/api/custom-code/jobs"],
+  ["get", "/api/custom-code/jobs/job-1"],
+  ["post", "/api/custom-code/jobs/job-1/stop"],
   ["post", "/api/host-capabilities/displays/enable"],
   ["post", "/api/host-capabilities/displays/disable"],
   ["post", "/api/host-capabilities/displays/setup-prerequisites"],

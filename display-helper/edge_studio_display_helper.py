@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 import hmac
+import base64
 import json
 import os
 import signal
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -67,6 +69,56 @@ class DisplayHelper:
     def __init__(self):
         self.lock = threading.Lock()
         self.display = None
+        self.session = None
+
+    def active_session(self):
+        if self.session and self.session["expires"] <= time.monotonic():
+            self.session = None
+        return self.session
+
+    def acquire(self, payload):
+        owner = payload.get("owner")
+        config = payload.get("config", {})
+        rotation, _, _ = validate_display({"config": config, "content": {"text": "session"}})
+        if not isinstance(owner, str) or not owner or len(owner) > 100:
+            raise ValueError("Display session owner is required")
+        with self.lock:
+            session = self.active_session()
+            if session and session["owner"] != owner:
+                raise ValueError("Display is in use by a custom script")
+            self.session = {"owner": owner, "rotation": rotation, "expires": time.monotonic() + 15}
+        return {"ok": True}
+
+    def release(self, payload):
+        with self.lock:
+            if self.session and self.session["owner"] == payload.get("owner"):
+                self.session = None
+        return {"ok": True}
+
+    def write_image(self, image):
+        if self.display is None:
+            st7789, _, _, _ = display_modules()
+            self.display = st7789.ST7789(port=0, cs=0, dc=25, backlight=24,
+                                       width=240, height=240, rotation=0,
+                                       spi_speed_hz=16000000, offset_left=0, offset_top=0)
+        self.display.display(image)
+
+    def frame(self, payload):
+        rgb = payload.get("rgb")
+        if not isinstance(rgb, str) or len(rgb) != 230400:
+            raise ValueError("Frame must contain 240x240 RGB pixels")
+        raw = base64.b64decode(rgb, validate=True)
+        if len(raw) != 240 * 240 * 3:
+            raise ValueError("Frame must contain 240x240 RGB pixels")
+        _, Image, _, _ = display_modules()
+        image = Image.frombytes("RGB", (240, 240), raw)
+        with self.lock:
+            session = self.active_session()
+            if not session or session["owner"] != payload.get("owner"):
+                raise ValueError("Display session has expired or belongs to another job")
+            self.write_image(image.rotate(session["rotation"]))
+            session["expires"] = time.monotonic() + 15
+        return {"ok": True}
 
     def capabilities(self):
         try:
@@ -81,12 +133,9 @@ class DisplayHelper:
         rotation, title, text = validate_display(payload)
         image = render_text(title, text).rotate(rotation)
         with self.lock:
-            if self.display is None:
-                st7789, _, _, _ = display_modules()
-                self.display = st7789.ST7789(port=0, cs=0, dc=25, backlight=24,
-                                           width=240, height=240, rotation=0,
-                                           spi_speed_hz=16000000, offset_left=0, offset_top=0)
-            self.display.display(image)
+            if self.active_session():
+                raise ValueError("Display is in use by a custom script; stop its job before writing text")
+            self.write_image(image)
         return {"model": "pim576", "rotation": rotation, "title": title, "text": text}
 
     def close(self):
@@ -125,14 +174,19 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if not self.authorized():
             return self.send_json(401, {"error": "Unauthorized"})
-        if self.path != "/display":
+        actions = {"/display": self.helper.update, "/session": self.helper.acquire,
+                   "/session/release": self.helper.release, "/frame": self.helper.frame}
+        if self.path not in actions:
             return self.send_json(404, {"error": "Not found"})
         try:
             length = int(self.headers.get("Content-Length", "0"))
-            if length <= 0 or length > 4096:
-                return self.send_json(400, {"error": "Display request must contain 1 to 4096 bytes"})
+            limit = 240000 if self.path == "/frame" else 4096
+            if length <= 0 or length > limit:
+                return self.send_json(400, {"error": "Display request size exceeds the limit"})
             payload = json.loads(self.rfile.read(length))
-            return self.send_json(200, self.helper.update(payload))
+            if not isinstance(payload, dict):
+                raise ValueError("Display request must be an object")
+            return self.send_json(200, actions[self.path](payload))
         except (ValueError, UnicodeError) as error:
             return self.send_json(400, {"error": str(error)})
         except Exception:

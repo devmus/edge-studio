@@ -16,7 +16,7 @@ describe("automation.policy", () => {
     const targetType = (id: string) => id === "screen" ? "spi-display" : undefined;
     assert.equal(DISPLAY_WORKFLOW_RUN_BUDGET_MAX_RUNS, 5000);
     assert.equal(workflowRunBudgetLimit([display, { type: "fetch_data_source", config_json: '{}' }], targetType), 5000);
-    for (const type of ["send_transaction", "capture_camera", "stamp_integritas"] as const) {
+    for (const type of ["send_transaction", "capture_camera", "stamp_integritas", "run_custom_code"] as const) {
       assert.equal(workflowRunBudgetLimit([display, { type, config_json: '{}' }], targetType), 1000);
       assert.equal(workflowRunBudgetLimit([display, { type, config_json: '{}', enabled: 0 }], targetType), 5000);
     }
@@ -32,7 +32,7 @@ describe("automation.policy", () => {
   });
 
   it("treats payment, device output, camera, and stamping blocks as privileged", () => {
-    assert.deepEqual([...PRIVILEGED_AUTOMATION_BLOCK_TYPES].sort(), ["capture_camera", "control_output", "send_transaction", "stamp_integritas"]);
+    assert.deepEqual([...PRIVILEGED_AUTOMATION_BLOCK_TYPES].sort(), ["capture_camera", "control_output", "run_custom_code", "send_transaction", "stamp_integritas"]);
     for (const type of ["manual_start", "webhook_event_start", "record_trigger_event", "fetch_data_source", "set_variable", "if_payload_field_equals", "wait", "show_preview"] as const) {
       assert.equal(isPrivilegedAutomationBlock(type), false, type);
     }

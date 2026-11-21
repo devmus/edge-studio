@@ -1,6 +1,6 @@
 # Pimoroni PIM576 SPI LCD
 
-Display workflow text on the **1.54-inch SPI Colour Square LCD (240×240), Pimoroni PIM576**. This is an output target, not a readable sensor. The first version supports a title and wrapped text, white on black, using a fixed font. Images, graphs, animation and other display models are outside this integration.
+Display workflow text on the **1.54-inch SPI Colour Square LCD (240×240), Pimoroni PIM576**. This is an output target, not a readable sensor. Control device supports a title and wrapped text, white on black, using a fixed font. Custom images/graphs/animation can be rendered by [installed Python scripts](./custom-code.md) through exclusive frame sessions; other display models remain unsupported.
 
 Product: [Pimoroni PIM576](https://shop.pimoroni.com/en-eu/products/1-54-spi-colour-square-lcd-240x240-breakout?variant=39351811702867). The implementation uses [Pimoroni's ST7789 driver](https://github.com/pimoroni/st7789-python), version 1.0.1. The supplied board photo labels power, CS, SCK, MOSI, DC, BL and GND. The shop page was rate-limited during development; physical panel geometry, orientation and colour behaviour must be checked on the actual board before support is marked verified.
 

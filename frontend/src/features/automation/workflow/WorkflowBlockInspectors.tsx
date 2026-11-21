@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { Button } from "../../../components/Button";
+import { CustomCodeInspector } from "./CustomCodeInspector";
 import { CheckboxField } from "../../../components/ui/CheckboxField";
 import { InputField } from "../../../components/ui/InputField";
 import { SelectField } from "../../../components/ui/SelectField";
@@ -156,6 +157,8 @@ export function DraftBlockInspector({
       </InspectorSection>
     );
   }
+
+  if (block.type === "run_custom_code") return <CustomCodeInspector blockId={block.id} config={block.config} sources={sources} onChange={onChange} />;
 
   if (block.type === "fetch_data_source") {
     return (

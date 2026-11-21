@@ -19,10 +19,10 @@ import subprocess
 import sys
 
 
-SERVICES = ("edge-studio-host-agent", "edge-studio-camera-helper", "edge-studio-sensor-helper", "edge-studio-display-helper")
+SERVICES = ("edge-studio-host-agent", "edge-studio-camera-helper", "edge-studio-sensor-helper", "edge-studio-display-helper", "edge-studio-script-helper")
 CODE = (
     "backend", "frontend", "update-agent", "host-agent", "camera-helper", "sensor-helper",
-    "display-helper", ".venv-display-helper",
+    "display-helper", ".venv-display-helper", "script-helper",
     "bin", "scripts", "docker", "docs", "node_modules", ".git", ".github", ".agents",
     ".claude", ".cursor", ".venv-sensor-helper", ".env.example", "package-lock.json",
     "docker-compose.yml", "docker-compose.release.yml", "docker-compose.override.yml",

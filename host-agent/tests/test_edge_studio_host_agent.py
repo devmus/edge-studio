@@ -40,9 +40,29 @@ class HostAgentWriteTests(unittest.TestCase):
         self.agent.CAMERA_SERVICE_FILE = self.root / "edge-studio-camera-helper.service"
         self.agent.SENSOR_SERVICE_FILE = self.root / "edge-studio-sensor-helper.service"
         self.agent.DISPLAY_SERVICE_FILE = self.root / "edge-studio-display-helper.service"
+        self.agent.SCRIPT_SERVICE_FILE = self.root / "edge-studio-script-helper.service"
 
     def tearDown(self):
         self.tmp.cleanup()
+
+    def test_script_setup_is_fixed_non_root_preserves_token_and_installs_no_dependencies(self):
+        self.agent.ENV_FILE.write_text("SCRIPT_HELPER_TOKEN=retained\nSCRIPT_HELPER_PORT=39184\nKEEP_ME=true\n", encoding="utf-8")
+        code = self.root / "script-helper" / "edge_studio_script_helper.py"
+        code.parent.mkdir()
+        code.write_text("# helper")
+        with patch.object(self.agent, "run", return_value=self.agent.subprocess.CompletedProcess([], 0, "", "")) as run, patch.object(self.agent, "restart_backend", return_value={"ok": True}):
+            self.agent.apply_scripts()
+            self.agent.apply_scripts()
+            self.agent.disable_scripts()
+        service = self.agent.SCRIPT_SERVICE_FILE.read_text()
+        self.assertIn("User=edge-studio-code", service)
+        self.assertIn("PrivateDevices=true", service)
+        self.assertIn("KillMode=control-group", service)
+        self.assertIn("SCRIPT_HELPER_PORT=39184", service)
+        self.assertIn("SCRIPT_HELPER_TOKEN=retained", service)
+        self.assertIn("KEEP_ME=true", self.agent.ENV_FILE.read_text())
+        self.assertIn("ENABLE_CUSTOM_CODE=false", self.agent.ENV_FILE.read_text())
+        self.assertFalse(any("pip" in call.args[0] or "apt-get" in call.args[0] for call in run.call_args_list))
 
     def test_display_setup_and_repair_retain_token_environment_and_fixed_commands(self):
         self.agent.ENV_FILE.write_text("DISPLAY_HELPER_TOKEN=existing-display-token\nENABLE_DISPLAYS=false\nKEEP_ME=true\n", encoding="utf-8")

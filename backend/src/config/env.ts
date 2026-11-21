@@ -64,6 +64,9 @@ const MB = 1024 * 1024;
 const databasePath = resolveDatabasePath();
 
 export const env = {
+  customCodeEnabled: process.env.ENABLE_CUSTOM_CODE === "true",
+  scriptHelperUrl: process.env.SCRIPT_HELPER_URL ?? "http://host.docker.internal:38184",
+  scriptHelperToken: process.env.SCRIPT_HELPER_TOKEN ?? "",
   displaysEnabled: process.env.ENABLE_DISPLAYS === "true",
   displayHelperUrl: process.env.DISPLAY_HELPER_URL ?? "http://host.docker.internal:38183",
   displayHelperToken: process.env.DISPLAY_HELPER_TOKEN ?? "",

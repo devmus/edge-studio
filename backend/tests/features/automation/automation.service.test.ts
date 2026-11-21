@@ -541,6 +541,38 @@ describe("automation.service — if_payload_field_equals", () => {
 });
 
 describe("automation.service — set_variable", () => {
+  it("runs installed code through the real client, budgets it and exposes its result to later blocks", async () => {
+    const env = (await import("../../../src/config/env.js")).env;
+    const saved = { enabled: env.customCodeEnabled, token: env.scriptHelperToken };
+    env.customCodeEnabled = true;
+    env.scriptHelperToken = "test-runner-token";
+    const job = { id: "11111111-1111-4111-8111-111111111111", status: "success", result: { doubled: 25 }, logs: "", error: null };
+    const fetch = vi.fn(async (url: string) => Response.json(url.endsWith("/scripts")
+      ? { items: [{ id: "double", name: "Double", capabilities: [] }], errors: [] }
+      : url.endsWith("/run") ? { job, action: "started" } : { ok: true }));
+    vi.stubGlobal("fetch", fetch);
+    try {
+      const wf = makeWorkflow([
+        { type: "manual_start", config: {} },
+        { type: "set_variable", config: { variableName: "lux", variableSource: "custom_json", valueJsonText: "12.5" } },
+        { type: "run_custom_code", config: { scriptId: "double", executionMode: "bounded", inputsJsonText: '{"value":"{{lux}}"}' } },
+        { type: "set_variable", config: { variableName: "answer", variableSource: "context_field", fieldPath: "output.job.result.doubled" } },
+      ]);
+      await service.runAutomationWorkflow(wf.id);
+      const run = service.listSerializedAutomationRunsForWorkflow(wf.id)[0];
+      assert.equal(run.status, "success");
+      assert.equal(run.blocks[2].blockLabel, "Run custom code");
+      assert.equal((run.blocks[3].output as { variables: { answer: number } }).variables.answer, 25);
+      const request = fetch.mock.calls.find(([url]) => url.endsWith("/run"))!;
+      assert.deepEqual(JSON.parse((request as unknown as [string, { body: string }])[1].body).inputs, { value: 12.5 });
+      assert.equal((db.prepare("SELECT COUNT(*) AS n FROM automation_workflow_budget_events WHERE workflow_id = ?").get(wf.id) as { n: number }).n, 1);
+    } finally {
+      env.customCodeEnabled = saved.enabled;
+      env.scriptHelperToken = saved.token;
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("throws on an invalid variable name", async () => {
     const wf = makeWorkflow([
       { type: "manual_start", config: {} },

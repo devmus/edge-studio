@@ -107,6 +107,17 @@ function expectWarning(result: { warnings: { code: string }[] }, code: string) {
 }
 
 describe("validateAutomationDraft — workflow shape", () => {
+  it("validates custom code configuration and requires opt-in runner support", async () => {
+    const previous = env.customCodeEnabled;
+    env.customCodeEnabled = false;
+    try {
+      const valid = block({ clientId: "code", type: "run_custom_code", config: { scriptId: "example", executionMode: "background", timeoutSeconds: null, onRunning: "update", inputsJsonText: "{}" } });
+      expectError(await validation.validateAutomationDraft([manualStart(), valid]), "custom_code.disabled");
+      expectError(await validation.validateAutomationDraft([manualStart(), { ...valid, config: { scriptId: "../script" } }]), "custom_code.invalid_config");
+      expectError(await validation.validateAutomationDraft([manualStart(), { ...valid, config: { scriptId: "example", executionMode: "bounded", timeoutSeconds: null } }]), "custom_code.invalid_config");
+    } finally { env.customCodeEnabled = previous; }
+  });
+
   it("accepts one-second scheduling and rejects invalid intervals", async () => {
     for (const intervalSeconds of [1, 10, 60]) {
       const result = await validation.validateAutomationDraft([block({ clientId: "start", type: "schedule_start", config: { intervalSeconds } })]);

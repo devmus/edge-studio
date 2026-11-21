@@ -21,6 +21,7 @@ HOST_CAPABILITY_DEBUG = os.environ.get("HOST_CAPABILITY_DEBUG", "false")
 CAMERA_SERVICE_FILE = Path("/etc/systemd/system/edge-studio-camera-helper.service")
 SENSOR_SERVICE_FILE = Path("/etc/systemd/system/edge-studio-sensor-helper.service")
 DISPLAY_SERVICE_FILE = Path("/etc/systemd/system/edge-studio-display-helper.service")
+SCRIPT_SERVICE_FILE = Path("/etc/systemd/system/edge-studio-script-helper.service")
 COMPOSE_OVERRIDE_FILE = APP_DIR / "docker-compose.override.yml"
 GPIO_OVERRIDE_MARKER = "# Managed by Edge Studio host-agent for GPIO support."
 SUPPRESS_RESTARTS = False
@@ -29,6 +30,11 @@ HOST_RUNTIME_FILES = {
     "camera-helper/edge_studio_camera_helper.py": 0o644,
     "sensor-helper/edge_studio_sensor_helper.py": 0o644,
     "display-helper/edge_studio_display_helper.py": 0o644,
+    "script-helper/edge_studio_script_helper.py": 0o644,
+    "script-helper/edge_script.py": 0o644,
+    "script-helper/examples/animate-lux/script.json": 0o644,
+    "script-helper/examples/animate-lux/main.py": 0o644,
+    "script-helper/examples/animate-lux/requirements.txt": 0o644,
     "docker/mosquitto/mosquitto.conf": 0o644,
 }
 
@@ -759,6 +765,63 @@ def all_capabilities():
     return [camera_status(), gpio_status(), sensor_status(), mqtt_status(), display_status()]
 
 
+def apply_scripts():
+    helper = APP_DIR / "script-helper" / "edge_studio_script_helper.py"
+    if not helper.is_file():
+        raise ValueError("Script helper code is missing. Refresh installation files first.")
+    config = read_env()
+    port = config.get("SCRIPT_HELPER_PORT", "38184")
+    if not port.isdigit() or not 1 <= int(port) <= 65535:
+        raise ValueError("SCRIPT_HELPER_PORT must be between 1 and 65535")
+    token = config.get("SCRIPT_HELPER_TOKEN") or secrets.token_hex(32)
+    gateway = config.get("EDGE_STUDIO_DOCKER_GATEWAY", "172.30.0.1")
+    if run(["id", "-u", "edge-studio-code"], check=False).returncode != 0:
+        run(["useradd", "--system", "--user-group", "--home-dir", "/var/lib/edge-studio-scripts", "--shell", "/usr/sbin/nologin", "edge-studio-code"])
+    run(["install", "-d", "-m", "0755", "/opt/edge-studio-scripts"])
+    run(["install", "-d", "-m", "0700", "-o", "edge-studio-code", "/var/lib/edge-studio-scripts"])
+    service = f"""[Unit]
+Description=Edge Studio Trusted Script Runner
+After=network.target docker.service
+
+[Service]
+Type=simple
+User=edge-studio-code
+Group=edge-studio-code
+WorkingDirectory={APP_DIR}/script-helper
+Environment=SCRIPT_HELPER_HOST={gateway}
+Environment=SCRIPT_HELPER_PORT={port}
+Environment=SCRIPT_HELPER_TOKEN={token}
+Environment=DISPLAY_HELPER_URL={config.get('DISPLAY_HELPER_URL', '')}
+Environment=DISPLAY_HELPER_TOKEN={config.get('DISPLAY_HELPER_TOKEN', '')}
+ExecStart=/usr/bin/python3 {helper}
+KillMode=control-group
+NoNewPrivileges=true
+PrivateDevices=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/edge-studio-scripts
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+"""
+    write_text_atomic(SCRIPT_SERVICE_FILE, service, 0o600)
+    run(["systemctl", "daemon-reload"])
+    run(["systemctl", "enable", "edge-studio-script-helper.service"])
+    run(["systemctl", "restart", "edge-studio-script-helper.service"])
+    write_env({"ENABLE_CUSTOM_CODE": "true", "SCRIPT_HELPER_PORT": port, "SCRIPT_HELPER_TOKEN": token,
+               "SCRIPT_HELPER_URL": f"http://{gateway}:{port}"})
+    return {"enabled": True, "restart": restart_backend(read_env())}
+
+
+def disable_scripts():
+    run(["systemctl", "disable", "--now", "edge-studio-script-helper.service"])
+    write_env({"ENABLE_CUSTOM_CODE": "false"})
+    return {"enabled": False, "restart": restart_backend(read_env())}
+
+
 def apply_host_runtime_update(artifact_bytes):
     changed = []
     try:
@@ -805,7 +868,11 @@ def restart_host_runtime_services(changed):
     if "docker/mosquitto/mosquitto.conf" in changed and is_truthy(config.get("ENABLE_MQTT_BROKER")):
         restarts.append({"service": "mqtt", **schedule_compose(config, ["up", "-d", "mqtt"])})
     if "host-agent/edge_studio_host_agent.py" in changed:
+        if is_truthy(config.get("ENABLE_CUSTOM_CODE")):
+            restarts.append(restart_systemd_service("edge-studio-script-helper.service"))
         restarts.append(restart_systemd_service("edge-studio-host-agent.service", delayed=True))
+    elif any(file.startswith("script-helper/") for file in changed) and is_truthy(config.get("ENABLE_CUSTOM_CODE")):
+        restarts.append(restart_systemd_service("edge-studio-script-helper.service"))
     return restarts
 
 
@@ -1009,6 +1076,8 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def cli_action(action, capability):
+    if capability == "scripts":
+        return apply_scripts() if action == "apply" else disable_scripts()
     if capability == "displays":
         if action == "apply":
             return apply_displays()
@@ -1040,7 +1109,7 @@ def parse_args():
     subparsers = parser.add_subparsers(dest="command")
     action_parser = subparsers.add_parser("capability", help="Apply or disable a hardware capability")
     action_parser.add_argument("action", choices=["apply", "disable"])
-    action_parser.add_argument("capability", choices=["camera", "gpio", "sensors", "mqtt", "displays"])
+    action_parser.add_argument("capability", choices=["camera", "gpio", "sensors", "mqtt", "displays", "scripts"])
     action_parser.add_argument("--install-mode", action="store_true", help="Skip backend/Compose restarts; installer will start services later")
     return parser.parse_args()
 

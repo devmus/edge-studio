@@ -793,6 +793,14 @@ function DomainBlockInputSummary({
     );
   }
 
+  if (block.type === "run_custom_code") {
+    return <SummaryRows rows={[
+      { label: "Script", value: block.config.scriptId || "Not selected" },
+      { label: "Mode", value: block.config.executionMode === "background" ? "Run in background" : "Wait for completion" },
+      { label: "Inputs", value: block.config.inputsJsonText ?? "{}" },
+    ]} />;
+  }
+
   if (block.type === "control_output") {
     return (
       <SummaryRows
@@ -839,6 +847,7 @@ const DomainInputBlockTypes = new Set<string>([
   "show_preview",
   "stamp_integritas",
   "control_output",
+  "run_custom_code",
   "send_transaction",
 ]);
 
@@ -959,6 +968,16 @@ function DomainBlockResultSummary({
     );
   }
 
+  if (block.type === "run_custom_code" && blockOutput) {
+    const job = contextRecord(blockOutput.job);
+    return <SummaryRows rows={[
+      { label: "Job ID", value: typeof job?.id === "string" ? job.id : "No job" },
+      { label: "Status at this run", value: typeof job?.status === "string" ? job.status : "Unknown" },
+      { label: "Action", value: typeof blockOutput.action === "string" ? blockOutput.action : "Started" },
+      { label: "Script result", value: shortRunValue(job?.result) },
+    ]} />;
+  }
+
   if (block.type === "control_output" && blockOutput) {
     return (
       <SummaryRows
@@ -1001,6 +1020,7 @@ function hasDomainBlockResult(block: AutomationBlock, blockRun: AutomationRun["b
       block.type === "if_payload_field_equals" ||
       block.type === "set_variable" ||
       block.type === "control_output" ||
+      block.type === "run_custom_code" ||
       block.type === "send_transaction") &&
     nestedOutput(blockRun.output)
   ) return true;

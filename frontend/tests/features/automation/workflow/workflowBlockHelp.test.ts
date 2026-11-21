@@ -22,6 +22,7 @@ const ALL_TYPES: AutomationBlockType[] = [
   "show_preview",
   "stamp_integritas",
   "control_output",
+  "run_custom_code",
   "send_transaction",
 ];
 

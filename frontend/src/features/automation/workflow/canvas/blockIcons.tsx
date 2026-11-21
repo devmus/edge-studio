@@ -46,6 +46,7 @@ const blockTypeIcon: Record<AutomationBlockType, LucideIcon> = {
   show_preview: Zap,
   stamp_integritas: ShieldCheck,
   control_output: Cpu,
+  run_custom_code: Cpu,
   send_transaction: Send,
 };
 

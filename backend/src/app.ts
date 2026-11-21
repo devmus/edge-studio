@@ -4,6 +4,7 @@ import { authProtectedRouter, authPublicRouter } from "./features/auth/auth.rout
 import { requireAuth } from "./features/auth/auth.middleware.js";
 import { setupRouter } from "./features/auth/setup.routes.js";
 import { automationRouter } from "./features/automation/automation.routes.js";
+import { customCodeRouter } from "./features/custom-code/customCode.routes.js";
 import { dataReadsRouter } from "./features/data-reads/dataReads.routes.js";
 import { feedbackRouter } from "./features/feedback/feedback.routes.js";
 import {
@@ -54,6 +55,7 @@ export function createApp() {
   app.use("/api/data-sources", dataSourcesRouter);
   app.use("/api/data-reads", dataReadsRouter);
   app.use("/api/automation", automationRouter);
+  app.use("/api/custom-code", customCodeRouter);
   app.use("/api/feedback", feedbackRouter);
   app.use("/api/wallet", walletRouter);
   app.use("/api/wallet/address-book", addressBookRouter);

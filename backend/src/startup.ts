@@ -1,5 +1,6 @@
 import { reconcileMinimaResync, stopMinimaResyncObserver } from "./features/minima/minima-resync.service.js";
 import { env } from "./config/env.js";
+import { startCustomCodeReconciler, stopCustomCodeReconciler } from "./features/custom-code/customCode.service.js";
 import { db, runMigrations } from "./db/database.js";
 import { createApp } from "./app.js";
 import {
@@ -39,6 +40,7 @@ import { ensureDeviceId } from "./features/status/device.service.js";
 
 runMigrations();
 await ensureDeviceId();
+startCustomCodeReconciler();
 startAutomationScheduler();
 startIntegritasProofPoller();
 reconcileMinimaResync();
@@ -61,6 +63,7 @@ app.listen(env.port, "0.0.0.0", () => {
 });
 
 function shutdown() {
+  stopCustomCodeReconciler();
   stopAutomationScheduler();
   stopIntegritasProofPoller();
   stopMinimaHealthPoller();

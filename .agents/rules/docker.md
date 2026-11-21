@@ -1,5 +1,7 @@
 # Docker / Pi Rules
 
+- Custom Python runs only through the opt-in `edge-studio-script-helper` under the dedicated `edge-studio-code` account. Fixed installer/terminal setup enables it (`ENABLE_CUSTOM_CODE`); do not add generic root-agent HTTP code/package endpoints. Preserve user source `/opt/edge-studio-scripts` and jobs/data `/var/lib/edge-studio-scripts` on update/uninstall. Dependencies are manually installed per script, never during workflow runs. LCD frame sessions remain in the display helper, with no new backend device mounts. Keep SDK/helper/example runtime allowlists synchronized and use installer refresh for first adoption. This is trusted installed code, not a sandbox or deferred Module Builder runtime.
+
 - PIM576 text output uses the opt-in display-helper service (`ENABLE_DISPLAYS=true`), bound to the configured Docker gateway with a backend-only token; never mount SPI/GPIO into the backend for display output. Preserve `.venv-display-helper`, its token and port across installer refreshes. First adoption on an older host agent requires an installer refresh to install the new helper file; later signed artifacts include it in their fixed allowlist.
 
 - UI is exposed on HTTPS at `${FRONTEND_PORT:-8080}` (container port 443) with a self-signed cert in `${DATA_DIR:-./data}/certs`.

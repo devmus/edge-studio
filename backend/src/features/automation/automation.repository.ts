@@ -18,6 +18,7 @@ export type AutomationBlockType =
   | "show_preview"
   | "stamp_integritas"
   | "control_output"
+  | "run_custom_code"
   | "send_transaction";
 
 export type AutomationWorkflowRecord = {

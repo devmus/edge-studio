@@ -183,6 +183,11 @@ class PreflightTests(unittest.TestCase):
         self.assertEqual(code, 0, output)
         self.assertTrue({38180, 38181, 1883}.issubset({c.args[0][1] for c in calls}))
 
+    def test_enabled_script_helper_and_retained_port(self):
+        code, output, calls = self.run_check(values=args + ["38183", "false", "39184", "true"])
+        self.assertEqual(code, 0, output)
+        self.assertIn(39184, {c.args[0][1] for c in calls})
+
     def test_foreign_listener_and_recovery_message(self):
         code, output, _ = self.run_check(busy=True)
         self.assertEqual(code, 1)

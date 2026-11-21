@@ -1,6 +1,6 @@
 # Supported hardware, devices and workflow blocks
 
-Use this catalog to check what Edge Studio can do before choosing hardware or proposing a new integration. It describes the implementation in this checkout, reviewed on **2026-11-20**: five optional hardware/service capabilities, sixteen device/integration templates and fifteen workflow block types. Older installed versions may differ.
+Use this catalog to check what Edge Studio can do before choosing hardware or proposing a new integration. It describes the implementation in this checkout, reviewed on **2026-11-21**: five optional hardware/service capabilities, sixteen device/integration templates and sixteen workflow block types. The installed-script runner is a separate opt-in terminal/installer service. Older installed versions may differ.
 
 Jump to [hardware capabilities](#hardware-capabilities), [devices and integrations](#devices-and-integrations), [workflow blocks](#workflow-blocks), or [requesting and contributing support](#requesting-and-contributing-support).
 
@@ -85,6 +85,7 @@ These are the current toolkit names. Some older guides call **Control device** â
 | Action | Show preview | Create a local Workflow Inbox item | Text, JSON, links or image references from configured content/context; not an external notification service |
 | Action | Control device | Send an output command | GPIO LED, HTTP JSON Target, MQTT Publisher or PIM576 SPI LCD; actual effect depends on target/action |
 | Action | Send payment | Send native MINIMA to a saved recipient | Available Minima node, usable address book recipient and funds; current workflow payments use native MINIMA (`0x00`) |
+| Action | Run custom code | Run installed Python, waiting for completion or managing a background job | Opt-in non-root script runner; trusted installed scripts; JSON inputs/results, job status/stop and optional exclusive LCD frames; see [setup and animation example](./custom-code.md) |
 | Attached | Stamp data | Create an Integritas proof for a data hash | Attach to Record trigger event, Fetch data source or Capture camera; configured Integritas access required |
 
 Workflows execute an ordered sequence. Add one start block first; device-dependent blocks may be unavailable until a suitable device exists. Stamping attaches to a data block rather than adding a separate final step. Validation checks configuration and dependencies before execution; it does not prove physical wiring or external service behaviour. Payments, outputs and capture perform real actions when run.

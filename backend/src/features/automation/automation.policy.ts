@@ -8,6 +8,7 @@ export const WORKFLOW_RUN_BUDGET_WINDOW_MS = 60 * 60 * 1000;
 export const PRIVILEGED_AUTOMATION_BLOCK_TYPES: ReadonlySet<AutomationBlockType> = new Set<AutomationBlockType>([
   "send_transaction",
   "control_output",
+  "run_custom_code",
   "capture_camera",
   "stamp_integritas"
 ]);

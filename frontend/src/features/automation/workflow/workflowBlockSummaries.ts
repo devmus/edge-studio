@@ -30,6 +30,10 @@ type WorkflowBlockSummaryFormatter = (
 
 const blockSummaryFormatters = {
   manual_start: () => summary([{ label: "Run mode", value: "Manual" }]),
+  run_custom_code: (block) => summary([
+    { label: "Script", value: block.config.scriptId || "Select script" },
+    { label: "Mode", value: block.config.executionMode === "background" ? "Run in background" : "Wait for completion" },
+  ]),
   schedule_start: (block) => {
     const interval = formatInterval(Number(block.config.intervalSeconds ?? 60));
     return summary([{ label: "Interval", value: interval }]);

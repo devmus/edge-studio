@@ -30,6 +30,9 @@ CAMERA_PHOTO_COMMAND_INPUT="${CAMERA_PHOTO_COMMAND-}"
 CAMERA_VIDEO_COMMAND_INPUT="${CAMERA_VIDEO_COMMAND-}"
 ENABLE_SENSORS_INPUT="${ENABLE_SENSORS-}"
 ENABLE_DISPLAYS_INPUT="${ENABLE_DISPLAYS-}"
+ENABLE_CUSTOM_CODE_INPUT="${ENABLE_CUSTOM_CODE-}"
+SCRIPT_HELPER_TOKEN_INPUT="${SCRIPT_HELPER_TOKEN-}"
+SCRIPT_HELPER_PORT_INPUT="${SCRIPT_HELPER_PORT-}"
 DISPLAY_HELPER_TOKEN_INPUT="${DISPLAY_HELPER_TOKEN-}"
 DISPLAY_HELPER_PORT_INPUT="${DISPLAY_HELPER_PORT-}"
 SENSOR_HELPER_TOKEN_INPUT="${SENSOR_HELPER_TOKEN-}"
@@ -71,6 +74,9 @@ CAMERA_PHOTO_COMMAND="${CAMERA_PHOTO_COMMAND:-rpicam-still}"
 CAMERA_VIDEO_COMMAND="${CAMERA_VIDEO_COMMAND:-rpicam-vid}"
 ENABLE_SENSORS="${ENABLE_SENSORS:-false}"
 ENABLE_DISPLAYS="${ENABLE_DISPLAYS:-false}"
+ENABLE_CUSTOM_CODE="${ENABLE_CUSTOM_CODE:-false}"
+SCRIPT_HELPER_TOKEN="${SCRIPT_HELPER_TOKEN:-}"
+SCRIPT_HELPER_PORT="${SCRIPT_HELPER_PORT:-38184}"
 DISPLAY_HELPER_TOKEN="${DISPLAY_HELPER_TOKEN:-}"
 DISPLAY_HELPER_PORT="${DISPLAY_HELPER_PORT:-38183}"
 SENSOR_HELPER_TOKEN="${SENSOR_HELPER_TOKEN:-}"
@@ -160,6 +166,7 @@ prompt_port() {
 
 configure_ports() {
   DISPLAY_HELPER_PORT="${DISPLAY_HELPER_PORT:-38183}"
+  SCRIPT_HELPER_PORT="${SCRIPT_HELPER_PORT:-38184}"
   if [ "$ADVANCED_INSTALL" = true ]; then
     if ! { exec 3<>/dev/tty; } 2>/dev/null; then
       echo "Advanced installation requires a terminal. For headless installs, pass port environment variables using sudo env." >&2
@@ -174,11 +181,12 @@ configure_ports() {
     prompt_port SENSOR_HELPER_PORT "Sensor helper port (optional service)"
     prompt_port MQTT_PUBLIC_PORT "MQTT broker port (optional service)"
     prompt_port DISPLAY_HELPER_PORT "SPI display helper port (optional service)"
+    prompt_port SCRIPT_HELPER_PORT "Custom script helper port (optional service)"
     exec 3>&-
   fi
 
   local variable
-  local ports=(FRONTEND_PORT MINIMA_P2P_PORT MINIMA_RPC_PORT HOST_AGENT_PORT CAMERA_HELPER_PORT SENSOR_HELPER_PORT MQTT_PUBLIC_PORT DISPLAY_HELPER_PORT)
+  local ports=(FRONTEND_PORT MINIMA_P2P_PORT MINIMA_RPC_PORT HOST_AGENT_PORT CAMERA_HELPER_PORT SENSOR_HELPER_PORT MQTT_PUBLIC_PORT DISPLAY_HELPER_PORT SCRIPT_HELPER_PORT)
   local selected=()
   local previous
   for variable in "${ports[@]}"; do
@@ -205,7 +213,7 @@ check_port_conflicts() {
   log "Checking host ports before installation"
   python3 - "$APP_DIR" "$MINIMA_RPC_BIND" "$FRONTEND_PORT" "$MINIMA_P2P_PORT" "$MINIMA_RPC_PORT" \
     "$HOST_AGENT_PORT" "$CAMERA_HELPER_PORT" "$SENSOR_HELPER_PORT" "$MQTT_PUBLIC_PORT" \
-    "$ENABLE_CAMERA" "$ENABLE_SENSORS" "$ENABLE_MQTT_BROKER" "${DISPLAY_HELPER_PORT:-38183}" "${ENABLE_DISPLAYS:-false}" <<'PORT_PREFLIGHT_PY'
+    "$ENABLE_CAMERA" "$ENABLE_SENSORS" "$ENABLE_MQTT_BROKER" "${DISPLAY_HELPER_PORT:-38183}" "${ENABLE_DISPLAYS:-false}" "${SCRIPT_HELPER_PORT:-38184}" "${ENABLE_CUSTOM_CODE:-false}" <<'PORT_PREFLIGHT_PY'
 import errno
 import json
 import os
@@ -294,6 +302,8 @@ def check_ports(args):
     bindings = container_bindings(app_dir)
     if len(args) > 13 and truthy(args[13]):
         specs.append(("Display helper", int(args[12]), "0.0.0.0", None, None, "edge-studio-display-helper.service"))
+    if len(args) > 15 and truthy(args[15]):
+        specs.append(("Script helper", int(args[14]), "0.0.0.0", None, None, "edge-studio-script-helper.service"))
     errors = []
     for name, port, address, service, target, helper in specs:
         # Wildcard publications overlap every address; explicit addresses only overlap themselves.
@@ -664,6 +674,9 @@ load_existing_config() {
   CAMERA_VIDEO_COMMAND="${CAMERA_VIDEO_COMMAND_INPUT:-${CAMERA_VIDEO_COMMAND:-rpicam-vid}}"
   ENABLE_SENSORS="${ENABLE_SENSORS_INPUT:-${ENABLE_SENSORS:-false}}"
   ENABLE_DISPLAYS="${ENABLE_DISPLAYS_INPUT:-${ENABLE_DISPLAYS:-false}}"
+  ENABLE_CUSTOM_CODE="${ENABLE_CUSTOM_CODE_INPUT:-${ENABLE_CUSTOM_CODE:-false}}"
+  SCRIPT_HELPER_TOKEN="${SCRIPT_HELPER_TOKEN_INPUT:-${SCRIPT_HELPER_TOKEN:-}}"
+  SCRIPT_HELPER_PORT="${SCRIPT_HELPER_PORT_INPUT:-${SCRIPT_HELPER_PORT:-38184}}"
   DISPLAY_HELPER_TOKEN="${DISPLAY_HELPER_TOKEN_INPUT:-${DISPLAY_HELPER_TOKEN:-}}"
   DISPLAY_HELPER_PORT="${DISPLAY_HELPER_PORT_INPUT:-${DISPLAY_HELPER_PORT:-38183}}"
   SENSOR_HELPER_TOKEN="${SENSOR_HELPER_TOKEN_INPUT:-${SENSOR_HELPER_TOKEN:-}}"
@@ -1064,6 +1077,10 @@ write_env_file() {
   local enable_camera_runtime="$ENABLE_CAMERA"
   local enable_sensors_runtime="$ENABLE_SENSORS"
   local enable_displays_runtime="$ENABLE_DISPLAYS"
+  local enable_custom_code_runtime="$ENABLE_CUSTOM_CODE"
+  if is_truthy "$ENABLE_CUSTOM_CODE_INPUT"; then
+    enable_custom_code_runtime="false"
+  fi
   if is_truthy "$ENABLE_DISPLAYS_INPUT"; then
     enable_displays_runtime="false"
   fi
@@ -1110,6 +1127,10 @@ ENABLE_DISPLAYS=$enable_displays_runtime
 DISPLAY_HELPER_URL=http://$EDGE_STUDIO_DOCKER_GATEWAY:$DISPLAY_HELPER_PORT
 DISPLAY_HELPER_PORT=$DISPLAY_HELPER_PORT
 DISPLAY_HELPER_TOKEN=$DISPLAY_HELPER_TOKEN
+ENABLE_CUSTOM_CODE=$enable_custom_code_runtime
+SCRIPT_HELPER_URL=http://$EDGE_STUDIO_DOCKER_GATEWAY:$SCRIPT_HELPER_PORT
+SCRIPT_HELPER_PORT=$SCRIPT_HELPER_PORT
+SCRIPT_HELPER_TOKEN=$SCRIPT_HELPER_TOKEN
 SENSOR_HELPER_URL=http://$EDGE_STUDIO_DOCKER_GATEWAY:$SENSOR_HELPER_PORT
 SENSOR_HELPER_TOKEN=$SENSOR_HELPER_TOKEN
 SENSOR_HELPER_PORT=$SENSOR_HELPER_PORT
@@ -1223,6 +1244,12 @@ apply_hardware_shortcuts_via_host_agent() {
     run_host_agent_capability apply camera
   elif [ -n "$ENABLE_CAMERA_INPUT" ]; then
     run_host_agent_capability disable camera
+  fi
+
+  if is_truthy "$ENABLE_CUSTOM_CODE"; then
+    run_host_agent_capability apply scripts
+  elif [ -n "$ENABLE_CUSTOM_CODE_INPUT" ]; then
+    run_host_agent_capability disable scripts
   fi
 
   if is_truthy "$ENABLE_GPIO"; then

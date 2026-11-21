@@ -10,5 +10,10 @@
   "camera-helper/edge_studio_camera_helper.py",
   "sensor-helper/edge_studio_sensor_helper.py",
   "display-helper/edge_studio_display_helper.py",
+  "script-helper/edge_studio_script_helper.py",
+  "script-helper/edge_script.py",
+  "script-helper/examples/animate-lux/script.json",
+  "script-helper/examples/animate-lux/main.py",
+  "script-helper/examples/animate-lux/requirements.txt",
   "docker/mosquitto/mosquitto.conf"
 ]

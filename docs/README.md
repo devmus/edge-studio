@@ -149,6 +149,7 @@ Start a public source contribution at [CONTRIBUTING.md](../CONTRIBUTING.md). The
 | [guides/bme280-sensor.md](./guides/bme280-sensor.md) | BME280/BME680 I2C sensor setup |
 | [guides/bh1750-sensor.md](./guides/bh1750-sensor.md) | Adafruit BH1750 direct-Pi I2C lux readings, setup and physical verification status |
 | [guides/pim576-display.md](./guides/pim576-display.md) | Pimoroni SPI LCD text output, fixed wiring, custom-variable workflow and fork-to-Pi verification |
+| [guides/custom-code.md](./guides/custom-code.md) | Installed Python scripts, execution modes, managed jobs, inputs/results and LCD animation |
 | [guides/tester-device-workflows.md](./guides/tester-device-workflows.md) | Short tester matrix for Pi and PC device/workflow tests |
 | [guides/pi-benchmark.md](./guides/pi-benchmark.md) | Benchmarking Edge Studio on a Pi for the wiki hardware page |
 | [guides/minima-testnet.md](./guides/minima-testnet.md) | Dev-only private Minima testnet on a dev Pi for wallet testing |

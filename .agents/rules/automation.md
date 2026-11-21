@@ -1,5 +1,7 @@
 # Automation Rules
 
+- `run_custom_code` uses the opt-in non-root installed-script helper, never backend/root shell execution. Wait for completion gates workflow success; background start returns a job and later failures remain job state. Keep/restart/update is scoped per workflow/block. Stop owned jobs on pause/archive/delete/config edits, reconcile ownership and interrupt orphaned jobs without automatic resumption. Custom-code triggers reserve a privileged slot at 1,000/hour, including Keep/Update; script-internal work is outside that ledger. Installed Python is trusted code, not sandboxed by mode or manifest capabilities. See `docs/guides/custom-code.md`.
+
 - Automation workflows are ordered block pipelines. V1 supports start blocks, data/capture blocks, variables, conditions, output control, wallet transaction, and attached Integritas stamping blocks.
 - Each rule follows When / Condition / Then. Keep rules atomic; chain rules instead of adding multiple unrelated actions to one rule.
 - Data/capture blocks either record an event trigger, fetch an HTTP JSON Source, or capture Raspberry Pi Camera media.

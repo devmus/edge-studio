@@ -428,6 +428,17 @@ describe("WatchRuntimeOverview", () => {
 });
 
 describe("WatchRuntimeInspector", () => {
+  it("shows a custom-code job acknowledgement separately from completed script work", () => {
+    render(<WatchRuntimeInspector
+      selectedBlock={block({ type: "run_custom_code", config: { scriptId: "animate-lux", executionMode: "background", inputsJsonText: "{}" } })}
+      latestBlockRun={blockRun({ blockType: "run_custom_code", input: {}, output: { output: { action: "started", job: { id: "job-123", status: "running", result: null } } } })}
+      selectedRun={run()}
+    />);
+    expect(screen.getByText("Status at this run")).toBeInTheDocument();
+    expect(screen.getByText("job-123")).toBeInTheDocument();
+    expect(screen.getByText("Run in background")).toBeInTheDocument();
+  });
+
   it("shows a prompt when no run is selected", () => {
     render(
       <WatchRuntimeInspector

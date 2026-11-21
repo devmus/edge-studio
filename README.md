@@ -17,6 +17,8 @@ The current prototype contains:
 
 See [supported hardware, devices and workflow blocks](docs/guides/supported-capabilities.md) for the capability catalog, prerequisites, setup guides and recorded verification evidence.
 
+**Run custom code** executes trusted installed Python scripts through an opt-in non-root host service. Select **Wait for completion** or **Run in background**, supply JSON inputs, and inspect results/logs or stop jobs from the block inspector. Background repeat policies keep, restart or update the existing job. Scripts live in `/opt/edge-studio-scripts`, with retained state under `/var/lib/edge-studio-scripts`; app updates do not overwrite user source. The runner is not a Python sandbox and remains disabled by default (`ENABLE_CUSTOM_CODE=true` enables fixed installer setup). See [script setup, lifecycle and LCD animation](docs/guides/custom-code.md).
+
 ## Contribute and request improvements
 
 Missing device support or a workflow capability? Use the request and contribution-guide links beneath the Devices or Workflows list. The device picker and workflow toolkit also include compact request links. Requests open the matching public GitHub form; general questions can use private Quick feedback.
@@ -47,7 +49,7 @@ If another application uses one of Edge Studio's ports, use the guided installer
 curl -fsSL https://raw.githubusercontent.com/edge-studio-technology/edge-studio/main/install.sh | sudo bash -s -- --advanced
 ```
 
-The installer asks for the HTTPS frontend, Minima peer-to-peer, Minima local RPC, host agent, camera helper, sensor helper, MQTT broker, and SPI display helper ports. Press Enter to keep the displayed value. Existing installations show saved values; explicit environment overrides take precedence over saved values. Optional service ports are saved even while those services are disabled. The backend and update-agent use internal Docker ports and need no host port selection. Advanced mode changes port numbers only; Minima RPC keeps its configured bind address (`127.0.0.1` by default), and optional services remain disabled unless explicitly enabled.
+The installer asks for the HTTPS frontend, Minima peer-to-peer, Minima local RPC, host agent, camera helper, sensor helper, MQTT broker, SPI display helper and custom-script helper ports. Press Enter to keep the displayed value. Existing installations show saved values; explicit environment overrides take precedence over saved values. Optional service ports are saved even while those services are disabled. The backend and update-agent use internal Docker ports and need no host port selection. Advanced mode changes port numbers only; Minima RPC keeps its configured bind address (`127.0.0.1` by default), and optional services remain disabled unless explicitly enabled.
 
 Both installation modes validate port numbers (1–65535), require distinct host ports, and check ports for services being started before installing packages or changing application files. Conflicts report the service and port, with instructions to rerun using `--advanced`. Running containers and helpers belonging to the same installation are allowed during reruns. These checks are a snapshot; another process can still claim a port before startup. Disabled optional services' ports are saved but are not checked for availability or reserved on the host.
 
@@ -57,7 +59,7 @@ Advanced mode reads answers from the terminal, including when the installer is p
 curl -fsSL https://raw.githubusercontent.com/edge-studio-technology/edge-studio/main/install.sh | sudo env FRONTEND_PORT=8443 MINIMA_P2P_PORT=19003 bash
 ```
 
-Other port variables are `MINIMA_RPC_PORT`, `HOST_AGENT_PORT`, `CAMERA_HELPER_PORT`, `SENSOR_HELPER_PORT`, `MQTT_PUBLIC_PORT`, and `DISPLAY_HELPER_PORT`. The preflight requires Python 3; if it is missing, run `sudo apt-get install python3` first. If Docker is already installed, its daemon must be running for the publication check. After installation, use the HTTPS URL printed by the installer with your selected frontend port.
+Other port variables are `MINIMA_RPC_PORT`, `HOST_AGENT_PORT`, `CAMERA_HELPER_PORT`, `SENSOR_HELPER_PORT`, `MQTT_PUBLIC_PORT`, `DISPLAY_HELPER_PORT`, and `SCRIPT_HELPER_PORT`. The preflight requires Python 3; if it is missing, run `sudo apt-get install python3` first. If Docker is already installed, its daemon must be running for the publication check. After installation, use the HTTPS URL printed by the installer with your selected frontend port.
 
 ### Verified Install (recommended)
 

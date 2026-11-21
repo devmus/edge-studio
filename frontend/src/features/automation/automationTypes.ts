@@ -35,6 +35,7 @@ export type AutomationBlockType =
   | "show_preview"
   | "stamp_integritas"
   | "control_output"
+  | "run_custom_code"
   | "send_transaction";
 
 export type ConditionOperator =
@@ -58,6 +59,11 @@ export type AutomationBlock = {
   order: number;
   parentBlockId: string | null;
   config: {
+    scriptId?: string;
+    executionMode?: "bounded" | "background";
+    onRunning?: "keep" | "restart" | "update";
+    timeoutSeconds?: number | null;
+    inputsJsonText?: string;
     sourceId?: string;
     targetId?: string;
     action?: "pulse" | "send_request" | "publish" | "display_text";

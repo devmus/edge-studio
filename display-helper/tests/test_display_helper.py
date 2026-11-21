@@ -1,4 +1,5 @@
 import http.client
+import base64
 import importlib.util
 import json
 import sys
@@ -17,6 +18,29 @@ spec.loader.exec_module(helper)
 
 
 class DisplayTests(unittest.TestCase):
+    def test_exclusive_frame_session_blocks_text_other_jobs_and_expired_writers(self):
+        display = helper.DisplayHelper()
+        config = {"model": "pim576", "rotation": 90}
+        display.acquire({"owner": "job-one", "config": config})
+        with self.assertRaisesRegex(ValueError, "in use"):
+            display.update({"config": config, "content": {"text": "Blocked"}})
+        with self.assertRaisesRegex(ValueError, "in use"):
+            display.acquire({"owner": "job-two", "config": config})
+        image = Image.new("RGB", (240, 240), "red")
+        rgb = base64.b64encode(image.tobytes()).decode()
+        display.frame({"owner": "job-one", "rgb": rgb})
+        self.assertEqual(self.driver.ST7789.return_value.display.call_args.args[0].tobytes(), image.rotate(90).tobytes())
+        with self.assertRaises(ValueError):
+            display.frame({"owner": "job-two", "rgb": rgb})
+        with self.assertRaises(ValueError):
+            display.frame({"owner": "job-one", "rgb": "bad"})
+        display.release({"owner": "job-two"})
+        self.assertIsNotNone(display.session)
+        with patch.object(helper.time, "monotonic", return_value=display.session["expires"] + 1):
+            with self.assertRaises(ValueError):
+                display.frame({"owner": "job-one", "rgb": rgb})
+            display.update({"config": config, "content": {"text": "Restored"}})
+
     def setUp(self):
         self.driver = types.ModuleType("st7789")
         self.driver.ST7789 = MagicMock()

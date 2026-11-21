@@ -18,6 +18,9 @@ for I2C, whose setup steps on Raspberry Pi OS are fixed and already shown in the
 
 ## Decision
 
+- **Trusted installed code uses a distinct non-root runner.** The approved custom-code extension runs fixed-ID Python entry points under `edge-studio-code`, outside the backend and root agent. Source stays in `/opt/edge-studio-scripts`; private managed jobs/data stay in `/var/lib/edge-studio-scripts`. Setup is a fixed installer/terminal action, not a remote generic code/package endpoint. Systemd service restrictions reduce accidental access but do not sandbox mutually untrusted Python or isolate same-account jobs. A minimal child environment avoids accidental credential inheritance; it is not an isolation guarantee. Per-script dependencies are installed deliberately, never at workflow execution.
+- **One code block, two lifetimes.** Bounded jobs gate workflow completion and fail it on nonzero exit/timeout. Background jobs return once spawned, with independent status/logs/results and explicit keep/restart/update repeat policy. Pause/archive/delete/config edits stop ownership-scoped jobs. Backend sessions/reconciliation and orphan expiry stop abandoned jobs; restarts never resume them. A job result is not an exactly-once external-effect guarantee. Four concurrent jobs and bounded inputs/results/logs keep cooperative scripts manageable; detached/uncooperative Python remains trusted operator behavior.
+- **LCD ownership remains in the display helper.** A custom-code manifest may request a PIM576 target; the runner brokers fixed-size RGB frames through an expiring exclusive lease and paces them to 20/second. Renewal every five seconds with a 15-second lease tolerates brief scheduling delays while releasing a crashed runner's display promptly. No second SPI handle, arbitrary image path or code execution is introduced into the display helper. Ten-second backend reconciliation with 45-second orphan expiry tolerates several missed requests before interrupting scripts; these are operational bounds, not measured hardware limits.
 - **Host-side helpers for device I/O.** Camera capture and BME/BH1750 sensor reads run in small,
   opt-in, token-protected host Python helpers (`camera-helper/`, `sensor-helper/`) reachable from
   the Docker subnet, exposing only allowlisted reads for supported devices. The backend container
@@ -50,6 +53,9 @@ for I2C, whose setup steps on Raspberry Pi OS are fixed and already shown in the
 
 ## Alternatives considered
 
+- **Animation-specific workflow blocks.** Constrain custom behavior to application-authored animations. Installed Python and a frame interface let operators supply animation logic without new block types.
+- **Inline Python or shell in the backend/root agent.** Couples trusted custom-code execution to application/root credentials and broadens an existing narrow boundary. A separate opt-in non-root service makes the execution trust explicit.
+- **Background start with no durable job record or repeat policy.** Hides later failures and spawns unbounded duplicates under schedules. Jobs keep observable status and one active execution per workflow/block.
 - **Mount `/dev/i2c-1` into the backend with a native Node I2C library.** Simpler at first, but
   fragile native builds on ARM/Docker and hardware access inside the app container.
 - **Use SMBus register-block reads for BH1750.** They send an extra command/register byte; BH1750 expects a raw two-byte I2C read after conversion. `smbus2.i2c_rdwr` provides that transaction without a new hardware service.
@@ -77,6 +83,7 @@ for I2C, whose setup steps on Raspberry Pi OS are fixed and already shown in the
 
 ## History
 
+- 2026-11-21: Added trusted installed-script execution, bounded/background lifecycle, fixed installer-only runner setup and exclusive LCD frame sessions.
 - 2026-11-20: Added explicit SPI prerequisite setup in Hardware support, with manual fallback and operator-managed reboot.
 - 2026-11-20: Added a narrow SPI text-display helper, fixed PIM576 wiring, managed driver dependencies and explicit first-adoption installer refresh.
 - 2026-11-19: BH1750 raw I2C lux reads, fixed conversion timing, managed smbus2 dependency and serialized measurements within the existing sensor capability.

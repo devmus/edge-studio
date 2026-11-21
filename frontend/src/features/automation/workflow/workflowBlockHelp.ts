@@ -25,6 +25,25 @@ export type WorkflowBlockHelpField = {
 };
 
 export const workflowBlockHelp = {
+  run_custom_code: {
+    category: "Action",
+    title: "Run custom code",
+    shortTitle: "Run code",
+    shortDescription: "Run an installed Python script.",
+    tooltip: "Wait for a script result or manage a background job.",
+    whatItDoes: "Starts trusted operator-installed Python through the opt-in non-root script helper.",
+    whenToUse: "Use for custom logic, device integrations and LCD animations beyond built-in actions.",
+    fields: [
+      { label: "Script", description: "An installed script ID. Refresh scripts after installing or editing a manifest.", required: true },
+      { label: "Execution mode", description: "Wait for completion fails the block on script failure. Background mode succeeds after starting; later failure is reported on the job.", required: true },
+      { label: "Inputs JSON", description: "JSON inputs with workflow variable interpolation, up to 16 KiB." },
+      { label: "When already running", description: "Keep the existing job, restart with new inputs or send an input update." },
+      { label: "Time limit, seconds", description: "1–3600 seconds. Background jobs may run without a time limit." },
+    ],
+    configuration: ["Install scripts outside the app checkout under /opt/edge-studio-scripts.", "Select a script, execution mode, inputs and optional display target.", "Installed code is trusted Python, not sandboxed. Modes do not restrict file or network access."],
+    outputs: ["A job ID, status and result in workflow output. Later blocks can read output.job.result through a context variable.", "Job status/logs remain separate from the workflow that started a background job. Pause, archive or delete stops owned jobs; restarts do not automatically resume them."],
+    examples: ["Animate a light-level bar on the PIM576 using an installed Python script."],
+  },
   manual_start: {
     category: "Start",
     title: "Manual run",
@@ -537,7 +556,7 @@ export const workflowBlockLibraryTypes = {
   ],
   Data: ["record_trigger_event", "fetch_data_source", "capture_camera", "set_variable"],
   Logic: ["if_payload_field_equals", "wait"],
-  Action: ["show_preview", "control_output", "send_transaction"],
+  Action: ["show_preview", "control_output", "send_transaction", "run_custom_code"],
   Attached: ["stamp_integritas"],
 } satisfies Record<WorkflowBlockCategory, AutomationBlockType[]>;
 

@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { stopCustomCodeOwner } from "../custom-code/customCode.service.js";
 import path from "node:path";
 import { Router } from "express";
 import { env } from "../../config/env.js";
@@ -142,6 +143,7 @@ automationRouter.patch("/workflows/:id", requireRole("admin"), async (req, res) 
   if (!current) return notFound(res, "Automation workflow not found");
   const enabled = typeof req.body?.enabled === "boolean" ? req.body.enabled : undefined;
   const archived = typeof req.body?.archived === "boolean" ? req.body.archived : undefined;
+  if ((enabled === false || archived === true) && !await stopOwnedCode(res, current.id)) return;
 
   if (enabled === true) {
     const validation = await validateAutomationWorkflow(current.id);
@@ -168,7 +170,7 @@ automationRouter.post("/workflows/:id/duplicate", requireRole("admin"), (req, re
   return res.json({ item: serializeAutomationWorkflow(workflow) });
 });
 
-automationRouter.patch("/workflows/:id/start-block", requireRole("admin"), (req, res) => {
+automationRouter.patch("/workflows/:id/start-block", requireRole("admin"), async (req, res) => {
   const workflow = getAutomationWorkflow(req.params.id);
   if (!workflow) return notFound(res, "Automation workflow not found");
   const type = typeof req.body?.type === "string" ? req.body.type as AutomationBlockType : "" as AutomationBlockType;
@@ -176,6 +178,7 @@ automationRouter.patch("/workflows/:id/start-block", requireRole("admin"), (req,
   try {
     const config = req.body?.config && typeof req.body.config === "object" && !Array.isArray(req.body.config) ? req.body.config as Record<string, unknown> : {};
     validateBlockConfig(type, config);
+    if (!await stopOwnedCode(res, workflow.id)) return;
     const block = replaceAutomationStartBlock(workflow.id, { type, config });
     if (!block) return badRequest(res, "The first workflow block must be a start block");
     updateAutomationWorkflow(workflow.id, { enabled: false, nextRunAt: null });
@@ -206,11 +209,12 @@ automationRouter.post("/workflows/:id/blocks", requireRole("admin"), (req, res) 
   }
 });
 
-automationRouter.patch("/workflows/:workflowId/blocks/:blockId", requireRole("admin"), (req, res) => {
+automationRouter.patch("/workflows/:workflowId/blocks/:blockId", requireRole("admin"), async (req, res) => {
   const workflow = getAutomationWorkflow(req.params.workflowId);
   if (!workflow) return notFound(res, "Automation workflow not found");
   const currentBlock = listAutomationBlocks(workflow.id).find((block) => block.id === req.params.blockId);
   if (!currentBlock) return notFound(res, "Block not found");
+  if (currentBlock.type === "run_custom_code" && !await stopOwnedCode(res, workflow.id, currentBlock.id)) return;
   const config = req.body?.config && typeof req.body.config === "object" && !Array.isArray(req.body.config) ? req.body.config as Record<string, unknown> : undefined;
   if (config) {
     try {
@@ -243,7 +247,8 @@ automationRouter.post("/workflows/:id/blocks/reorder", requireRole("admin"), (re
   }
 });
 
-automationRouter.delete("/workflows/:workflowId/blocks/:blockId", requireRole("admin"), (req, res) => {
+automationRouter.delete("/workflows/:workflowId/blocks/:blockId", requireRole("admin"), async (req, res) => {
+  if (!await stopOwnedCode(res, req.params.workflowId, req.params.blockId)) return;
   const deleted = deleteAutomationBlock(req.params.workflowId, req.params.blockId);
   if (!deleted) return notFound(res, "Block not found");
   syncMqttDataSources();
@@ -251,7 +256,8 @@ automationRouter.delete("/workflows/:workflowId/blocks/:blockId", requireRole("a
   return res.json({ deleted: true, workflow: serializeAutomationWorkflow(getAutomationWorkflow(req.params.workflowId)!) });
 });
 
-automationRouter.delete("/workflows/:id", requireRole("admin"), (req, res) => {
+automationRouter.delete("/workflows/:id", requireRole("admin"), async (req, res) => {
+  if (!await stopOwnedCode(res, req.params.id)) return;
   deleteAutomationWorkflow(req.params.id);
   syncMqttDataSources();
   syncGpioDataSources();
@@ -435,7 +441,18 @@ function isAutomationBlockType(type: string): type is AutomationBlockType {
     || type === "show_preview"
     || type === "stamp_integritas"
     || type === "control_output"
+    || type === "run_custom_code"
     || type === "send_transaction";
+}
+
+async function stopOwnedCode(res: Parameters<typeof dependencyUnavailable>[0], workflowId: string, blockId?: string) {
+  try {
+    await stopCustomCodeOwner(workflowId, blockId);
+    return true;
+  } catch {
+    dependencyUnavailable(res, "Custom script jobs could not be stopped. Restore the runner service and retry.");
+    return false;
+  }
 }
 
 function serializeAutomationInboxItem(item: { id: string; workflow_id: string | null; workflow_name: string; run_id: string | null; block_id: string | null; title: string; format: string; content_json: string; rendered_text: string | null; created_at: string; read_at: string | null }) {

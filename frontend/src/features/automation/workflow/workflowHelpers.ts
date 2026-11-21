@@ -76,6 +76,7 @@ export function defaultDraftConfig(
 ): AutomationBlock["config"] {
   if (type === "schedule_start") return { intervalSeconds: pollingIntervalSeconds };
   if (type === "manual_start") return {};
+  if (type === "run_custom_code") return { scriptId: "", executionMode: "bounded", onRunning: "keep", timeoutSeconds: 30, inputsJsonText: "{}" };
   if (type === "fetch_data_source") return { sourceId: firstReadableSource(sources)?.id ?? "" };
   if (type === "capture_camera") return { sourceId: firstCameraSource(sources)?.id ?? "" };
   if (

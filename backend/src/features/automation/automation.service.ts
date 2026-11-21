@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { runCustomCode, type CustomCodeConfig } from "../custom-code/customCode.service.js";
 import { db } from "../../db/database.js";
 import { conditionBaselineKey, evaluateNumericChange, type PendingConditionBaseline } from "./automationConditions.js";
 import {
@@ -465,7 +466,7 @@ async function executeBlock(
   context: WorkflowContext,
   runId: string,
 ) {
-  const config = JSON.parse(block.config_json) as {
+  const config = JSON.parse(block.config_json) as CustomCodeConfig & {
     sourceId?: string;
     targetId?: string;
     action?: string;
@@ -530,6 +531,7 @@ async function executeBlock(
     else if (block.type === "stamp_integritas")
       status = await stampLatestHash(workflow, context, config.condition ?? null);
     else if (block.type === "control_output") await controlOutput(config, context);
+    else if (block.type === "run_custom_code") context.output = await runCustomCode(config, { workflowId: workflow.id, blockId: block.id, runId }, interpolateValue(JSON.parse(config.inputsJsonText ?? "{}"), context.variables));
     else if (block.type === "send_transaction") await sendTransaction(config, context, workflow);
     else throw new Error(`Unsupported automation block: ${block.type}`);
     updateAutomationBlockRun(block.id);
@@ -969,6 +971,7 @@ function blockLabel(type: string) {
   if (type === "stamp_integritas") return "Stamp data";
   if (type === "set_variable") return "Set variable";
   if (type === "control_output") return "Control device";
+  if (type === "run_custom_code") return "Run custom code";
   if (type === "send_transaction") return "Send payment";
   if (type === "if_payload_field_equals") return "If field matches";
   if (type === "fetch_data_source") return "Fetch data source";

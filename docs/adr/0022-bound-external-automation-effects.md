@@ -42,6 +42,7 @@ Integritas history is evidence. A security limit should not decide their product
 
 **Run budget and cooldown**
 
+- `run_custom_code` also reserves a privileged slot, with the conservative 1,000/hour ceiling even when its manifest requests only display access. Keep/restart/update triggers count; internal script work and frames do not. Arbitrary trusted Python cannot be limited to a manifest-declared effect by this ledger. Bounded script failure fails the workflow; background success is only start acknowledgement, so successful-completion change baselines may advance before a later background failure.
 - Every workflow has a fixed budget of **1,000 privileged runs per rolling hour**, reserved before
   the first enabled `send_transaction`, `control_output`, `capture_camera`, or `stamp_integritas`
   block, for every trigger type. Stamping is included because automation stamps bypass the HTTP
