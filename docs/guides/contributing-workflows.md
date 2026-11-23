@@ -39,3 +39,15 @@ Paths without a prefix in the UI rows are under the frontend workflow folder; ba
 - [ ] Help/setup docs describe the feature and any unverified physical/service requirements honestly.
 
 When a device can use existing Fetch/Record/Output behaviour, document that path rather than inventing a new block per device model. Future Module Builder may expose package contributions, but no such runtime contract is required for a source PR today.
+
+## Run diagnostics
+
+Each stored block run includes an allowlisted `config` snapshot, a relevant `input` and the block's own `output`. The run owns the trigger payload; blocks do not repeat the full trigger, accumulated variables or previous action results. Read-producing blocks retain source/read IDs and hash; action blocks retain their result, including script-job association and proof/transaction/inbox references. Wait/start blocks need no copied result. The in-memory workflow context still supplies variables, previews and external output payloads independently of these diagnostic copies.
+
+Custom-code `config` records script ID, mode, repeat policy, runner timeout (including explicit `null`), input template and configured Device access. `input.resolvedInputs` records the resolved JSON passed to the runner before dispatch. A successful background block means dispatch succeeded; later completion/failure belongs to its separately inspected job. Kept/updated jobs can predate the selected run.
+
+Watch's configuration/input/result summaries use the recorded settings, not the current editor configuration. Run inspection also provides **Block execution details** when a block is no longer on the canvas. Full diagnostic values are available through **View recorded configuration**, **View recorded input**, **View recorded result** and run JSON.
+
+Redaction occurs before persistence using the shared redactor. JSON template strings are parsed first; unknown configuration fields are excluded. Diagnostic payloads are capped at 16 KiB, configuration fields and recorded job logs/results at 4 KiB; larger values show an omission marker and byte count. These caps do not change execution inputs or the live helper's separately retained logs/results.
+
+On the first startup introducing `automation_block_runs.config_json`, a transaction clears the previous development run/block records and adds the column. Later startups retain compact records. It does not clear workflow definitions, condition baselines, budget usage, read/proof history, inbox content or helper-owned script jobs. Inbox run references become null through their existing foreign key. No old-format reader or configuration backfill is provided. Existing imported history archives remain read-only JSON; new exports include diagnostic `config` alongside block input/output.

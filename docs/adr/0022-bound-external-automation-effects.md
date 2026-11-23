@@ -91,6 +91,12 @@ Integritas history is evidence. A security limit should not decide their product
 - Inbox age expiry is separate from the run/read cleanup switch. `inboxRetentionDays: null` means keep until manually deleted; a configured 7–3,650 days expires both read and unread items based on creation time. The form initially suggests 90 days when the operator turns this policy on. Items linked to active runs are excluded from both preview and expiry. Deleting an inbox row never deletes its linked image/capture/file. Older stored policy documents acquire the safe null default on read, without enabling expiry. Age-based expiry avoids a busy workflow evicting other workflows' inbox output via a global cap.
 - Wallet history, proofs, imported archives, audit events, and files are outside this cleanup. SQLite file size is not promised to shrink; no automatic VACUUM or disk-pressure deletion is introduced. The legacy generic pruning helpers remain tested but do not define the configured lifecycle policy.
 
+**Compact run evidence**
+
+- Persist an allowlisted configuration snapshot and block-specific input/result, with the trigger payload owned once by the parent run. Historic inspection uses recorded settings, not today's mutable workflow definition. Execution context and outward payload generation remain independent of diagnostic snapshots.
+- Apply shared redaction before storage, including parsed JSON template fields. Replace oversized diagnostic payloads with explicit omission metadata; retain script-job identity while bounding its copied logs/results separately. These are diagnostic limits, not execution limits, and cannot identify every private value in arbitrary user text.
+- The development transition deliberately clears pre-snapshot workflow runs and block runs once, in the same transaction that introduces the snapshot column. This is an explicit exception to normal opt-in retention, authorized while old development logs are disposable. Definitions, budgets, condition baselines, reads, proofs, inbox content, imported archives and helper-owned jobs survive; inbox run links become null. New records follow the normal retention policy. No configuration backfill or parallel legacy log reader is maintained.
+
 **Camera extension and media retention**
 
 - A separate SQLite document stores nullable camera age (1–3,650 days) and a paused flag. The legacy environment age seeds it once, initially paused; invalid/non-positive values mean keep. This preserves the old suggested policy without silently activating file deletion during upgrade. Helpers, mounts and enablement remain deployment configuration.
@@ -100,6 +106,9 @@ Integritas history is evidence. A security limit should not decide their product
 
 ## Alternatives considered
 
+- **Full pre/post workflow contexts per block.** Repeated trigger payloads, variables and inherited outputs dominate storage without recording the actual block settings. The next block's pre-context usually duplicates the previous block's post-context.
+- **Reconstruct historic settings from current workflow definitions or backfill old logs.** Edits and deletion make these settings unknowable. The development reset avoids presenting inferred configuration as execution evidence.
+- **A versioned legacy log reader and new detail API.** Deferred: existing routes and compact result envelopes support current consumers; disposable development records do not warrant parallel persistence formats.
 - **One 30-day / 10,000-row limit for every table** (first version). Treated diagnostics and user
   data alike and would delete existing data on the first sweep.
 - **Bound runs and block runs as diagnostics** (second version). The global oldest-first cap let one
@@ -141,6 +150,7 @@ Integritas history is evidence. A security limit should not decide their product
 
 ## History
 
+- 2026-11-23: Replaced full block context snapshots with compact redacted execution evidence and recorded configuration; authorized a one-time reset of pre-snapshot development run logs.
 - 2026-11-20: Added the fixed display-only 5,000/hour exception, edit-safe policy rechecks and successful-completion numeric change baselines independent of retained history.
 - 2026-11-03: Replaced capture-time environment pruning with confirmed camera policy, optional-extension pause/resume and proof-media protection (camera portion of #861); generated-download cleanup and Dashboard warnings remain separate.
 - 2026-11-03: Added independent opt-in inbox age expiry, preview counts and active-run/file protection; retained keep-until-deleted defaults and the shared inbox batch limit.

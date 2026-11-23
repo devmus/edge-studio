@@ -49,6 +49,17 @@ function run(overrides: Partial<AutomationRun> = {}): AutomationRun {
 }
 
 describe("AutomationRunInspectModal", () => {
+  it("shows recorded settings and results even after the original block was deleted", async () => {
+    render(<AutomationRunInspectModal run={run({ blocks: [blockRun({
+      blockId: null, blockType: "set_variable", blockLabel: "Set variable", config: { variableName: "lux", variableSource: "custom_json", valueJsonText: "30" }, output: { output: { action: "set_variable", name: "lux", value: 30 } },
+    })] })} onClose={() => {}} />);
+    await userEvent.click(screen.getByText("Block execution details"));
+    await userEvent.click(screen.getByText("0. Set variable · success"));
+    expect(screen.getByText("Recorded configuration")).toBeVisible();
+    expect(screen.getByText("Recorded result")).toBeVisible();
+    expect(screen.getAllByText(/valueJsonText/).length).toBeGreaterThan(0);
+  });
+
   it("includes the preserved script job and complete logs in failed-run details", async () => {
     render(<AutomationRunInspectModal run={run({ status: "failed", error: "Custom script failed", blocks: [blockRun({
       status: "failed", blockType: "run_custom_code", error: "Custom script failed",

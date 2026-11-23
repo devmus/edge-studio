@@ -166,6 +166,14 @@ export function runMigrations() {
 
   migrateAutomationRunsToPreserveDeletedWorkflows();
 
+  const logColumns = db.prepare("PRAGMA table_info(automation_block_runs)").all() as { name: string }[];
+  if (!logColumns.some((column) => column.name === "config_json")) {
+    db.transaction(() => {
+      db.exec("DELETE FROM automation_block_runs; DELETE FROM automation_runs;");
+      db.exec("ALTER TABLE automation_block_runs ADD COLUMN config_json TEXT NOT NULL DEFAULT '{}'");
+    })();
+  }
+
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_automation_runs_status_started
       ON automation_runs(status, started_at);

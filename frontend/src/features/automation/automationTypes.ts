@@ -140,6 +140,7 @@ export type AutomationBlockRun = {
   finishedAt: string | null;
   status: "running" | "success" | "failed" | "skipped";
   durationMs: number | null;
+  config?: AutomationBlock["config"];
   input: unknown;
   output: unknown;
   error: string | null;

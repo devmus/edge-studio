@@ -535,12 +535,69 @@ describe("automation.service — if_payload_field_equals", () => {
     await service.runAutomationWorkflow(wf.id, { type: "manual", payload: { go: true } });
     const runs = service.listSerializedAutomationRunsForWorkflow(wf.id);
     assert.equal(runs[0].blocks.length, 3);
-    const lastOutput = runs[0].blocks[2].output as { variables: Record<string, unknown> };
-    assert.equal(lastOutput.variables.reached, true);
+    assert.deepEqual(runs[0].blocks[2].output, { output: { action: "set_variable", name: "reached", value: true } });
   });
 });
 
 describe("automation.service — set_variable", () => {
+  it("records compact immutable configuration and does not repeat triggers, variables or previous results", async () => {
+    const secret = ["private", "payload"].join("-");
+    const wf = makeWorkflow([
+      { type: "manual_start", config: {} },
+      { type: "set_variable", config: { variableName: "message", variableSource: "custom_json", valueJsonText: "30" } },
+      { type: "wait", config: { durationMs: 0 } },
+    ]);
+    await service.runAutomationWorkflow(wf.id, { type: "manual", payload: { marker: "unique-trigger-marker", apiKey: secret } });
+    const saved = service.listSerializedAutomationRunsForWorkflow(wf.id)[0];
+    const variable = saved.blocks[1];
+    workflowRepo.updateAutomationBlock(wf.id, variable.blockId!, { config: { variableName: "message", variableSource: "custom_json", valueJsonText: "99" } });
+    const reloaded = service.listSerializedAutomationRunsForWorkflow(wf.id)[0];
+    assert.deepEqual(reloaded.blocks[1].config, { variableName: "message", variableSource: "custom_json", valueJsonText: "30" });
+    assert.deepEqual(reloaded.blocks[1].output, { output: { action: "set_variable", name: "message", value: 30 } });
+    assert.equal(reloaded.blocks[2].output, null, "wait inherited a previous block result");
+    assert.equal(reloaded.blocks[1].input, null);
+    assert.equal(JSON.stringify(reloaded.blocks).includes("unique-trigger-marker"), false);
+    assert.equal(JSON.stringify(reloaded).includes(secret), false);
+    assert.deepEqual(reloaded.triggerPayload, { marker: "unique-trigger-marker", apiKey: "[redacted]" });
+  });
+
+  it("records the same unlimited background inputs delivered to the runner and retains job identity with large logs", async () => {
+    const env = (await import("../../../src/config/env.js")).env;
+    const saved = { enabled: env.customCodeEnabled, token: env.scriptHelperToken };
+    env.customCodeEnabled = true;
+    env.scriptHelperToken = "test-runner-token";
+    const job = { id: "11111111-1111-4111-8111-111111111111", status: "running", result: null, logs: "x".repeat(20000), error: null };
+    const fetch = vi.fn(async (url: string) => Response.json(url.endsWith("/scripts")
+      ? { items: [{ id: "animate-lux", name: "Animation", capabilities: [] }], errors: [] }
+      : url.endsWith("/run") ? { job, action: "started" } : { ok: true }));
+    vi.stubGlobal("fetch", fetch);
+    try {
+      const wf = makeWorkflow([
+        { type: "manual_start", config: {} },
+        { type: "set_variable", config: { variableName: "message", variableSource: "custom_json", valueJsonText: "30" } },
+        { type: "run_custom_code", config: { scriptId: "animate-lux", executionMode: "background", onRunning: "update", timeoutSeconds: null, inputsJsonText: '{"lux":"{{message}}","durationSeconds":null}' } },
+      ]);
+      await service.runAutomationWorkflow(wf.id);
+      const block = service.listSerializedAutomationRunsForWorkflow(wf.id)[0].blocks[2];
+      assert.deepEqual(block.input, { resolvedInputs: { lux: 30, durationSeconds: null } });
+      const request = fetch.mock.calls.find(([url]) => url.endsWith("/run"))!;
+      const payload = JSON.parse((request as unknown as [string, { body: string }])[1].body);
+      assert.deepEqual(payload.inputs, { lux: 30, durationSeconds: null });
+      assert.equal(payload.timeoutSeconds, null);
+      const config = block.config as { timeoutSeconds: unknown; onRunning: string };
+      assert.equal(config.timeoutSeconds, null);
+      assert.equal(config.onRunning, "update");
+      const recorded = block.output as { output: { job: typeof job } };
+      assert.equal(recorded.output.job.id, job.id);
+      assert.equal(typeof recorded.output.job.logs, "string");
+      assert.match(recorded.output.job.logs, /omitted/);
+    } finally {
+      env.customCodeEnabled = saved.enabled;
+      env.scriptHelperToken = saved.token;
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("preserves a failed custom-code job and its native error instead of the previous variable result", async () => {
     const env = (await import("../../../src/config/env.js")).env;
     const saved = { enabled: env.customCodeEnabled, token: env.scriptHelperToken };
@@ -580,7 +637,7 @@ describe("automation.service — set_variable", () => {
     ]);
     await assert.rejects(service.runAutomationWorkflow(wf.id), /unknown variable/);
     const run = service.listSerializedAutomationRunsForWorkflow(wf.id)[0];
-    assert.equal((run.blocks[2].output as { output: unknown }).output, null);
+    assert.equal(run.blocks[2].output, null);
   });
 
   it("runs installed code through the real client, budgets it and exposes its result to later blocks", async () => {
@@ -604,7 +661,9 @@ describe("automation.service — set_variable", () => {
       const run = service.listSerializedAutomationRunsForWorkflow(wf.id)[0];
       assert.equal(run.status, "success");
       assert.equal(run.blocks[2].blockLabel, "Run custom code");
-      assert.equal((run.blocks[3].output as { variables: { answer: number } }).variables.answer, 25);
+      assert.deepEqual(run.blocks[3].output, { output: { action: "set_variable", name: "answer", value: 25 } });
+      assert.deepEqual(run.blocks[2].input, { resolvedInputs: { value: 12.5 } });
+      assert.deepEqual(run.blocks[2].config, { scriptId: "double", executionMode: "bounded", onRunning: "keep", timeoutSeconds: 30, inputsJsonText: '{"value":"{{lux}}"}' });
       const request = fetch.mock.calls.find(([url]) => url.endsWith("/run"))!;
       assert.deepEqual(JSON.parse((request as unknown as [string, { body: string }])[1].body).inputs, { value: 12.5 });
       assert.equal((db.prepare("SELECT COUNT(*) AS n FROM automation_workflow_budget_events WHERE workflow_id = ?").get(wf.id) as { n: number }).n, 1);
@@ -652,11 +711,8 @@ describe("automation.service — set_variable", () => {
     ]);
     await service.runAutomationWorkflow(wf.id, { type: "manual", payload: { foo: "bar" } });
     const runs = service.listSerializedAutomationRunsForWorkflow(wf.id);
-    const lastOutput = runs[0].blocks[runs[0].blocks.length - 1].output as { variables: Record<string, unknown> };
-    assert.equal(lastOutput.variables.a, 1);
-    assert.equal(lastOutput.variables.b, "bar");
-    assert.equal(lastOutput.variables.c, 5);
-    assert.equal(lastOutput.variables.d, "hash1");
+    const assignments = runs[0].blocks.filter((block) => block.blockType === "set_variable").map((block) => (block.output as { output: { name: string; value: unknown } }).output);
+    assert.deepEqual(Object.fromEntries(assignments.map(({ name, value }) => [name, value])), { a: 1, b: "bar", c: 5, d: "hash1" });
   });
 });
 
@@ -733,7 +789,9 @@ describe("automation.service — record_trigger_event", () => {
 
       const [run] = runsRepo.listAutomationRunsForWorkflow(wf.id, 1);
       const recordBlock = runsRepo.listAutomationBlockRuns(run.id).find((block) => block.block_type === "record_trigger_event")!;
-      assert.equal((JSON.parse(recordBlock.output_json!) as { data: { sourceUrl: string } }).data.sourceUrl, `data-source:${source.id}`);
+      const recordedData = (JSON.parse(recordBlock.output_json!) as { data: { sourceId: string; sourceUrl?: string } }).data;
+      assert.equal(recordedData.sourceId, source.id);
+      assert.equal(recordedData.sourceUrl, undefined);
       const stored = JSON.stringify([read, run, runsRepo.listAutomationBlockRuns(run.id)]);
       assert.equal(stored.includes(webhookToken) || stored.includes(brokerPassword), false, "a credential was persisted");
     }

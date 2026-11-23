@@ -655,27 +655,6 @@ function SummaryRows({ rows }: { rows: { label: string; value: ReactNode }[] }) 
   );
 }
 
-function inputContextValue(inputContext: Record<string, unknown> | null, source: string | undefined, path: string | undefined) {
-  if (!inputContext) return undefined;
-  if (source === "variable") return contextRecord(inputContext.variables)?.[String(path ?? "")];
-  if (source === "data") return getPathValue(contextRecord(inputContext.data)?.result, path);
-  return getPathValue(contextRecord(inputContext.trigger)?.payload, path);
-}
-
-function getPathValue(value: unknown, path: string | undefined) {
-  if (!path?.trim()) return undefined;
-  let current = value;
-  for (const part of path.split(".")) {
-    if (
-      current === null ||
-      typeof current !== "object" ||
-      !Object.prototype.hasOwnProperty.call(current, part)
-    ) return undefined;
-    current = (current as Record<string, unknown>)[part];
-  }
-  return current;
-}
-
 function variableSourceLabel(source: AutomationBlock["config"]["variableSource"]) {
   if (source === "trigger_field") return "Trigger field";
   if (source === "latest_data_field") return "Latest data field";
@@ -718,7 +697,7 @@ function DomainBlockInputSummary({
           { label: "Input", value: "Received trigger" },
           { label: "Trigger", value: typeof trigger?.type === "string" ? trigger.type : blockRun.blockType },
           { label: "Source", value: typeof trigger?.sourceId === "string" ? trigger.sourceId : "No source" },
-          { label: "Payload", value: isPresentRunValue(trigger?.payload) ? shortRunValue(trigger?.payload) : "No payload" },
+          { label: "Payload", value: "Stored with the workflow run" },
         ]}
       />
     );
@@ -730,7 +709,7 @@ function DomainBlockInputSummary({
         rows={[
           { label: "Input", value: "Trigger payload" },
           { label: "Trigger", value: typeof trigger?.type === "string" ? trigger.type : "trigger" },
-          { label: "Payload", value: isPresentRunValue(trigger?.payload) ? shortRunValue(trigger?.payload) : "No payload" },
+          { label: "Payload", value: "Stored with the workflow run" },
         ]}
       />
     );
@@ -742,7 +721,6 @@ function DomainBlockInputSummary({
         rows={[
           { label: "Input", value: block.type === "capture_camera" ? "Camera source" : "Data source" },
           { label: "Source ID", value: block.config.sourceId ?? "Not selected" },
-          { label: "Trigger", value: typeof trigger?.type === "string" ? trigger.type : "trigger" },
         ]}
       />
     );
@@ -763,7 +741,7 @@ function DomainBlockInputSummary({
   if (block.type === "if_payload_field_equals") {
     const source = block.config.source === "variable" ? "variable" : "trigger";
     const path = source === "variable" ? block.config.variableName : block.config.fieldPath;
-    const actual = inputContextValue(inputContext, source, path);
+    const actual = inputContext?.actual;
     return (
       <SummaryRows
         rows={[
@@ -786,7 +764,7 @@ function DomainBlockInputSummary({
         rows={[
           { label: "Content", value: previewContentLabel(block.config.contentMode) },
           { label: "Title", value: block.config.title ?? "Workflow preview" },
-          { label: "Latest data", value: typeof data?.sourceName === "string" ? data.sourceName : "No data selected" },
+          ...(block.config.contentMode === "latest_data" ? [{ label: "Latest data", value: typeof data?.sourceName === "string" ? data.sourceName : "Not recorded" }] : []),
         ]}
       />
     );
@@ -808,7 +786,10 @@ function DomainBlockInputSummary({
     return <SummaryRows rows={[
       { label: "Script", value: block.config.scriptId || "Not selected" },
       { label: "Mode", value: block.config.executionMode === "background" ? "Run in background" : "Wait for completion" },
-      { label: "Inputs", value: block.config.inputsJsonText ?? "{}" },
+      { label: "When already running", value: block.config.onRunning ?? "keep" },
+      { label: "Time limit", value: block.config.timeoutSeconds === null ? "No time limit" : `${block.config.timeoutSeconds ?? 30} seconds` },
+      { label: "Input template", value: block.config.inputsJsonText ?? "{}" },
+      { label: "Resolved inputs", value: JSON.stringify(inputContext?.resolvedInputs) ?? "Not recorded" },
       ...(block.config.targetId ? [{ label: "Device access ID", value: block.config.targetId }] : []),
     ]} />;
   }
@@ -841,7 +822,7 @@ function DomainBlockInputSummary({
 }
 
 function hasDomainBlockInput(block: AutomationBlock, blockRun: AutomationRun["blocks"][number]) {
-  return Boolean(contextRecord(blockRun.input) && DomainInputBlockTypes.has(block.type));
+  return Boolean(blockRun.config && DomainInputBlockTypes.has(block.type));
 }
 
 const DomainInputBlockTypes = new Set<string>([
@@ -872,20 +853,6 @@ function DomainBlockResultSummary({
 }) {
   const outputContext = contextRecord(blockRun.output);
   const blockOutput = nestedOutput(blockRun.output);
-
-  if (block.type.endsWith("_start") && outputContext) {
-    const trigger = contextRecord(outputContext.trigger);
-    return (
-      <SummaryRows
-        rows={[
-          { label: "Action", value: "Initialized run context" },
-          { label: "Trigger", value: typeof trigger?.type === "string" ? trigger.type : blockRun.blockType },
-          { label: "Data read", value: contextRecord(outputContext.data)?.readId ? "Available" : "Not created yet" },
-          { label: "Variables", value: isPresentRunValue(outputContext.variables) ? shortRunValue(outputContext.variables) : "No variables" },
-        ]}
-      />
-    );
-  }
 
   if (block.type === "record_trigger_event" && outputContext) {
     const data = contextRecord(outputContext.data);
@@ -942,12 +909,13 @@ function DomainBlockResultSummary({
 
   if (block.type === "stamp_integritas" && outputContext) {
     const action = typeof blockOutput?.action === "string" ? blockOutput.action : blockRun.status;
+    const hash = contextRecord(blockRun.input)?.hash;
     return (
       <SummaryRows
         rows={[
           { label: "Action", value: action },
-          { label: "Hash", value: typeof outputContext.hash === "string" ? outputContext.hash : "No hash" },
-          { label: "Proof", value: typeof outputContext.proofId === "string" ? outputContext.proofId : "No proof" },
+          { label: "Hash", value: typeof hash === "string" ? hash : "No hash" },
+          { label: "Proof", value: typeof blockOutput?.proofId === "string" ? blockOutput.proofId : "No proof" },
           { label: "Proof UID", value: typeof blockOutput?.proofUid === "string" ? blockOutput.proofUid : "No proof UID" },
         ]}
       />
@@ -1008,7 +976,6 @@ function DomainBlockResultSummary({
 }
 
 function hasDomainBlockResult(block: AutomationBlock, blockRun: AutomationRun["blocks"][number]) {
-  if (block.type.endsWith("_start") && contextRecord(blockRun.output)) return true;
   if (block.type === "wait") return true;
   if (
     (block.type === "fetch_data_source" ||
@@ -1030,7 +997,7 @@ function hasDomainBlockResult(block: AutomationBlock, blockRun: AutomationRun["b
 
 /** Watch-mode selected-block sheet: run/block status and output. */
 export function WatchRuntimeInspector({
-  selectedBlock,
+  selectedBlock: currentBlock,
   latestBlockRun,
   selectedRun,
   onCloseSelectedBlock,
@@ -1040,9 +1007,13 @@ export function WatchRuntimeInspector({
   selectedRun: AutomationRun | undefined;
   onCloseSelectedBlock?: () => void;
 }) {
+  const selectedBlock = currentBlock && latestBlockRun
+    ? { ...currentBlock, type: latestBlockRun.blockType as AutomationBlock["type"], config: latestBlockRun.config ?? {} }
+    : currentBlock;
   const readId = readIdFromOutput(latestBlockRun?.output);
-  const proofId =
-    selectedBlock?.type === "fetch_data_source" ? proofIdFromOutput(latestBlockRun?.output) : null;
+  const proofId = selectedBlock?.type === "stamp_integritas"
+    ? proofIdFromOutput(contextRecord(latestBlockRun?.output)?.output)
+    : selectedBlock?.type === "fetch_data_source" ? proofIdFromOutput(latestBlockRun?.output) : null;
   const showReadDiagnostics = Boolean(readId && blockCreatesDataRead(selectedBlock));
   const [readDetails, setReadDetails] = useState<DataSourceRead | null>(null);
   const [readDetailsLoading, setReadDetailsLoading] = useState(false);
@@ -1127,6 +1098,9 @@ export function WatchRuntimeInspector({
       {error ? <ErrorAlert action={<Button type="button" variant="secondary" size="sm" onClick={() => setInspectedError({ error, run: selectedRun })}>View error details</Button>}>
         {normalizeError(error).message}
       </ErrorAlert> : null}
+      {latestBlockRun && <InspectorSection title="Configuration" description="Settings recorded when this block executed.">
+        <JsonPreview value={latestBlockRun.config ?? {}} label="View recorded configuration" variant="button" className="w-full" />
+      </InspectorSection>}
       <InspectorSection
         title="Input"
         description="Data this block received during the selected run."
@@ -1140,7 +1114,7 @@ export function WatchRuntimeInspector({
             <DomainBlockInputSummary block={selectedBlock} blockRun={latestBlockRun} />
             <JsonPreview
               value={latestBlockRun.input}
-              label="View pre-block context"
+              label="View recorded input"
               variant="button"
               className="w-full"
             />
@@ -1150,7 +1124,7 @@ export function WatchRuntimeInspector({
             <RunValueSummary value={latestBlockRun?.input} />
             <JsonPreview
               value={latestBlockRun?.input}
-              label="View pre-block context"
+              label="View recorded input"
               variant="button"
               className="w-full"
             />
@@ -1174,7 +1148,7 @@ export function WatchRuntimeInspector({
             <DomainBlockResultSummary block={selectedBlock} blockRun={latestBlockRun} />
             <JsonPreview
               value={latestBlockRun.output}
-              label="View post-block context"
+              label="View recorded result"
               variant="button"
               className="w-full"
             />
@@ -1184,7 +1158,7 @@ export function WatchRuntimeInspector({
             <RunValueSummary value={latestBlockRun?.output} />
             <JsonPreview
               value={latestBlockRun?.output}
-              label="View post-block context"
+              label="View recorded result"
               variant="button"
               className="w-full"
             />

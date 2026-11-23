@@ -97,6 +97,35 @@ describe("runMigrations — data_source_reads.source_url scrub", () => {
 });
 
 describe("runMigrations — retention and budget schema", () => {
+  it("clears only old workflow logs once and preserves workflows, inbox, reads and budget reservations", () => {
+    db.exec(`
+      ALTER TABLE automation_block_runs DROP COLUMN config_json;
+      INSERT INTO automation_workflows (id, created_at, updated_at, name, enabled)
+        VALUES ('compact-log-test', '2026-01-01', '2026-01-01', 'Saved flow', 0);
+      INSERT INTO automation_blocks (id, workflow_id, created_at, updated_at, type, enabled, order_index, config_json, condition_baseline_value, condition_baseline_key)
+        VALUES ('compact-condition', 'compact-log-test', '2026-01-01', '2026-01-01', 'if_payload_field_equals', 1, 0, '{}', 12.5, 'baseline');
+      INSERT INTO automation_runs (id, workflow_id, workflow_name, started_at, status, trigger_type)
+        VALUES ('old-run', 'compact-log-test', 'Saved flow', '2026-01-01', 'success', 'manual');
+      INSERT INTO automation_block_runs (id, run_id, workflow_id, block_id, order_index, block_type, block_label, started_at, status)
+        VALUES ('old-block-run', 'old-run', 'compact-log-test', 'compact-condition', 0, 'if_payload_field_equals', 'Condition', '2026-01-01', 'success');
+      INSERT INTO automation_workflow_budget_events (run_id, workflow_id, consumed_at) VALUES ('old-run', 'compact-log-test', 1);
+      INSERT INTO automation_inbox_items (id, workflow_id, workflow_name, run_id, title, format, content_json, created_at)
+        VALUES ('retained-inbox', 'compact-log-test', 'Saved flow', 'old-run', 'Preview', 'text', '"hello"', '2026-01-01');
+    `);
+    insertRead("compact-retained-read", null, "device-system-data:local");
+    runMigrations();
+    assert.equal(db.prepare("SELECT id FROM automation_runs WHERE id = 'old-run'").get(), undefined);
+    assert.equal(db.prepare("SELECT id FROM automation_block_runs WHERE id = 'old-block-run'").get(), undefined);
+    assert.deepEqual(db.prepare("SELECT condition_baseline_value FROM automation_blocks WHERE id = 'compact-condition'").get(), { condition_baseline_value: 12.5 });
+    assert.deepEqual(db.prepare("SELECT run_id, content_json FROM automation_inbox_items WHERE id = 'retained-inbox'").get(), { run_id: null, content_json: '"hello"' });
+    assert.ok(db.prepare("SELECT id FROM data_source_reads WHERE id = 'compact-retained-read'").get());
+    assert.ok(db.prepare("SELECT run_id FROM automation_workflow_budget_events WHERE run_id = 'old-run'").get());
+    db.exec(`INSERT INTO automation_runs (id, workflow_name, started_at, status, trigger_type) VALUES ('new-run', 'Saved flow', '2026-01-02', 'success', 'manual');`);
+    runMigrations();
+    assert.ok(db.prepare("SELECT id FROM automation_runs WHERE id = 'new-run'").get());
+    assert.deepEqual(db.pragma("foreign_key_check"), []);
+  });
+
   it("creates the workflow budget ledger with a unique run id and the retention/budget indexes", () => {
     const columns = db.prepare("PRAGMA table_info(automation_workflow_budget_events)").all() as { name: string; pk: number }[];
     assert.deepEqual(columns.map((column) => column.name).sort(), ["consumed_at", "run_id", "workflow_id"]);

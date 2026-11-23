@@ -7,6 +7,7 @@
 - Data/capture blocks either record an event trigger, fetch an HTTP JSON Source, or capture Raspberry Pi Camera media.
 - The backend scheduler owns HTTP polling execution; webhook/MQTT/GPIO collect rules are triggered by incoming data while enabled.
 - Workflow variables are per-run only. `Set variable` can save custom JSON or field values from trigger/latest data/context for later conditions and output interpolation.
+- Run logs store allowlisted recorded block configuration and block-specific input/result, not full pre/post execution contexts. Use shared redaction before persistence, parsing JSON template strings first. Keep diagnostic copies separate from runtime context and external payloads; historical inspectors use the recorded config. The compact-log development migration clears prior run/block rows once while preserving budget/baseline/evidence state. See `docs/guides/contributing-workflows.md#run-diagnostics`.
 - `Show preview` writes durable local Automation inbox items for operator-facing text, JSON, links, and image references.
 - Store `last_run_at`, `next_run_at`, `last_hash`, `last_proof_id`, and `last_error`.
 - Save `last_hash` after successful data fetch or push ingestion even if Integritas stamping fails.

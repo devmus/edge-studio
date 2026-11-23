@@ -433,15 +433,31 @@ describe("WatchRuntimeOverview", () => {
 });
 
 describe("WatchRuntimeInspector", () => {
+  it("uses recorded configuration after edits and shows the resolved inputs including JSON null", async () => {
+    render(<WatchRuntimeInspector
+      selectedBlock={block({ type: "run_custom_code", config: { scriptId: "new-script", executionMode: "bounded", timeoutSeconds: 5 } })}
+      latestBlockRun={blockRun({ blockType: "run_custom_code", config: { scriptId: "animate-lux", executionMode: "background", timeoutSeconds: null, onRunning: "update", inputsJsonText: '{"lux":"{{message}}","durationSeconds":null}' }, input: { resolvedInputs: { lux: 30, durationSeconds: null } } })}
+      selectedRun={run()}
+    />);
+    expect(screen.getByText("animate-lux")).toBeInTheDocument();
+    expect(screen.queryByText("new-script")).not.toBeInTheDocument();
+    expect(screen.getByText("No time limit")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "View recorded input" }));
+    expect(screen.getByRole("dialog")).toHaveTextContent('"durationSeconds": null');
+    expect(screen.getByRole("dialog")).toHaveTextContent('"lux": 30');
+  });
+
   it("shows a custom-code job acknowledgement separately from completed script work", () => {
     render(<WatchRuntimeInspector
       selectedBlock={block({ type: "run_custom_code", config: { scriptId: "animate-lux", executionMode: "background", inputsJsonText: "{}" } })}
-      latestBlockRun={blockRun({ blockType: "run_custom_code", input: {}, output: { output: { action: "started", job: { id: "job-123", status: "running", result: null } } } })}
+      latestBlockRun={blockRun({ blockType: "run_custom_code", config: { scriptId: "animate-lux", executionMode: "background", timeoutSeconds: null, onRunning: "update", inputsJsonText: '{"lux":"{{message}}","durationSeconds":null}' }, input: { resolvedInputs: { lux: 30, durationSeconds: null } }, output: { output: { action: "started", job: { id: "job-123", status: "running", result: null } } } })}
       selectedRun={run()}
     />);
     expect(screen.getByText("Status at this run")).toBeInTheDocument();
     expect(screen.getByText("job-123")).toBeInTheDocument();
     expect(screen.getByText("Run in background")).toBeInTheDocument();
+    expect(screen.getByText("No time limit")).toBeInTheDocument();
+    expect(screen.getByText("update")).toBeInTheDocument();
   });
 
   it("shows a prompt when no run is selected", () => {
@@ -537,7 +553,7 @@ describe("WatchRuntimeInspector", () => {
     render(
       <WatchRuntimeInspector
         selectedBlock={block({ type: "control_output", config: { targetId: "target-1", action: "publish", bodyMode: "trigger_payload" } })}
-        latestBlockRun={blockRun({ input: { source: "trigger", active: true }, output: { foo: "bar" } })}
+        latestBlockRun={blockRun({ blockType: "control_output", config: { targetId: "target-1", action: "publish", bodyMode: "trigger_payload" }, input: { body: { active: true } }, output: { foo: "bar" } })}
         selectedRun={undefined}
       />,
     );
@@ -548,8 +564,8 @@ describe("WatchRuntimeInspector", () => {
     expect(screen.getByText("Trigger payload")).toBeInTheDocument();
     expect(screen.getByText("foo")).toBeInTheDocument();
     expect(screen.getByText("bar")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "View pre-block context" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "View post-block context" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "View recorded input" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "View recorded result" })).toBeInTheDocument();
   });
 
   it("summarizes fetch data source results with source, read, and hash", () => {
@@ -558,6 +574,7 @@ describe("WatchRuntimeInspector", () => {
         <WatchRuntimeInspector
           selectedBlock={block({ type: "fetch_data_source" })}
           latestBlockRun={blockRun({
+            blockType: "fetch_data_source",
             output: {
               data: { sourceName: "Device System Data", readId: "read-1" },
               hash: "hash-1",
@@ -579,6 +596,7 @@ describe("WatchRuntimeInspector", () => {
       <WatchRuntimeInspector
         selectedBlock={block({ type: "show_preview" })}
         latestBlockRun={blockRun({
+          blockType: "show_preview",
           output: {
             output: {
               action: "show_preview",
@@ -598,31 +616,27 @@ describe("WatchRuntimeInspector", () => {
     expect(screen.getByText("inbox-1")).toBeInTheDocument();
   });
 
-  it("summarizes start block input separately from run-context result", () => {
+  it("summarizes a trigger reference without copying its payload or a run-context result", () => {
     render(
       <WatchRuntimeInspector
         selectedBlock={block({ type: "mqtt_event_start" })}
         latestBlockRun={blockRun({
+          blockType: "mqtt_event_start",
+          config: { sourceId: "source-1" },
           input: {
-            trigger: { type: "mqtt", sourceId: "source-1", payload: { temperature: 21.5 } },
-            variables: {},
+            trigger: { type: "mqtt", sourceId: "source-1" },
           },
-          output: {
-            trigger: { type: "mqtt", sourceId: "source-1", payload: { temperature: 21.5 } },
-            variables: {},
-          },
+          output: null,
         })}
         selectedRun={undefined}
       />,
     );
 
     expect(screen.getByText("Received trigger")).toBeInTheDocument();
-    expect(screen.getByText("Initialized run context")).toBeInTheDocument();
-    expect(screen.getAllByText("mqtt")).toHaveLength(2);
+    expect(screen.getByText("No result recorded for the latest selected-block run.")).toBeInTheDocument();
+    expect(screen.getByText("mqtt")).toBeInTheDocument();
     expect(screen.getByText("source-1")).toBeInTheDocument();
-    expect(screen.getByText("1 field")).toBeInTheDocument();
-    expect(screen.getByText("Not created yet")).toBeInTheDocument();
-    expect(screen.getByText("0 fields")).toBeInTheDocument();
+    expect(screen.getByText("Stored with the workflow run")).toBeInTheDocument();
   });
 
   it("summarizes record trigger event results", () => {
@@ -631,6 +645,7 @@ describe("WatchRuntimeInspector", () => {
         <WatchRuntimeInspector
           selectedBlock={block({ type: "record_trigger_event" })}
           latestBlockRun={blockRun({
+            blockType: "record_trigger_event",
             output: {
               data: { sourceName: "MQTT Subscriber", readId: "read-1" },
               hash: "hash-1",
@@ -651,6 +666,7 @@ describe("WatchRuntimeInspector", () => {
       <WatchRuntimeInspector
         selectedBlock={block({ type: "set_variable" })}
         latestBlockRun={blockRun({
+          blockType: "set_variable",
           input: {
             trigger: { type: "manual", payload: { message: "Button pressed" } },
           },
@@ -675,8 +691,10 @@ describe("WatchRuntimeInspector", () => {
           config: { source: "trigger", fieldPath: "event.kind", operator: "equals", value: "doorbell" },
         })}
         latestBlockRun={blockRun({
+          blockType: "if_payload_field_equals",
+          config: { source: "trigger", fieldPath: "event.kind", operator: "equals", value: "doorbell" },
           input: {
-            trigger: { type: "webhook", payload: { event: { kind: "doorbell" } } },
+            actual: "doorbell",
           },
           output: {
             output: {
@@ -703,6 +721,7 @@ describe("WatchRuntimeInspector", () => {
       <WatchRuntimeInspector
         selectedBlock={block({ type: "send_transaction" })}
         latestBlockRun={blockRun({
+          blockType: "send_transaction",
           output: {
             output: {
               action: "sent_transaction",
@@ -727,6 +746,7 @@ describe("WatchRuntimeInspector", () => {
       <WatchRuntimeInspector
         selectedBlock={block({ type: "control_output" })}
         latestBlockRun={blockRun({
+          blockType: "control_output",
           input: {
             trigger: { type: "manual", payload: { active: true, source: "run-now" } },
             data: null,
@@ -750,8 +770,8 @@ describe("WatchRuntimeInspector", () => {
       />,
     );
 
-    expect(screen.getByText("trigger")).toBeInTheDocument();
-    expect(screen.getByText("manual · payload 2 fields")).toBeInTheDocument();
+    expect(screen.getAllByText("trigger")).toHaveLength(2);
+    expect(screen.getAllByText("manual · payload 2 fields")).toHaveLength(2);
     expect(screen.queryByText("data")).not.toBeInTheDocument();
     expect(screen.queryByText("output")).not.toBeInTheDocument();
     expect(screen.queryByText("hash")).not.toBeInTheDocument();
@@ -836,7 +856,7 @@ describe("WatchRuntimeInspector", () => {
       <MemoryRouter>
         <WatchRuntimeInspector
           selectedBlock={block({ type: "fetch_data_source" })}
-          latestBlockRun={blockRun({ output: { readId: "read-1" } })}
+          latestBlockRun={blockRun({ blockType: "fetch_data_source", output: { readId: "read-1" } })}
           selectedRun={undefined}
         />
       </MemoryRouter>,
@@ -856,7 +876,7 @@ describe("WatchRuntimeInspector", () => {
       <MemoryRouter>
         <WatchRuntimeInspector
           selectedBlock={block({ type: "show_preview" })}
-          latestBlockRun={blockRun({ output: { readId: "read-1" } })}
+          latestBlockRun={blockRun({ blockType: "show_preview", output: { readId: "read-1" } })}
           selectedRun={undefined}
         />
       </MemoryRouter>,
@@ -872,7 +892,7 @@ describe("WatchRuntimeInspector", () => {
       <MemoryRouter>
         <WatchRuntimeInspector
           selectedBlock={block({ type: "fetch_data_source" })}
-          latestBlockRun={blockRun({ output: { proofId: "proof-1" } })}
+          latestBlockRun={blockRun({ blockType: "fetch_data_source", output: { proofId: "proof-1" } })}
           selectedRun={undefined}
           onCloseSelectedBlock={onCloseSelectedBlock}
         />
@@ -891,7 +911,7 @@ describe("WatchRuntimeInspector", () => {
         <MemoryRouter>
           <WatchRuntimeInspector
             selectedBlock={block({ type: "show_preview" })}
-            latestBlockRun={blockRun({ output: { proofId: "proof-1" } })}
+            latestBlockRun={blockRun({ blockType: "show_preview", output: { proofId: "proof-1" } })}
             selectedRun={undefined}
           />
         </MemoryRouter>,

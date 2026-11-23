@@ -80,6 +80,16 @@ export function AutomationRunInspectModal({
             <CustomCodeRunJob key={block.id} blockRun={block} />
           </div>)}
         </Disclosure>}
+        <Disclosure title="Block execution details" defaultOpen={false}>
+          {run.blocks.map((block) => <Disclosure key={block.id} title={`${block.order}. ${block.blockLabel} · ${block.status}`} defaultOpen={false}>
+            <div className="gap-detail-next grid">
+              <strong>Recorded configuration</strong>
+              <JsonPreviewContent value={block.config ?? {}} />
+              {block.input != null && <><strong>Received input</strong><JsonPreviewContent value={block.input} /></>}
+              {block.output != null && <><strong>Recorded result</strong><JsonPreviewContent value={block.output} /></>}
+            </div>
+          </Disclosure>)}
+        </Disclosure>
         <Disclosure title="Run data">
           <JsonPreviewContent value={run} />
         </Disclosure>
