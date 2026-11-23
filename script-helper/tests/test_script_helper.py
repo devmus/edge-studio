@@ -61,6 +61,13 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(self.runner.scripts()["items"], [])
         self.assertEqual(len(self.runner.scripts()["errors"]), 1)
 
+    def test_manifest_normalizes_legacy_display_access_and_rejects_unknown_capabilities(self):
+        folder = self.script('pass', ["display"])
+        self.assertEqual(self.runner.manifest("test-script")["capabilities"], ["display.frames"])
+        (folder / "script.json").write_text(json.dumps({"id": folder.name, "capabilities": ["gpio"]}))
+        with self.assertRaisesRegex(ValueError, "display.frames"):
+            self.runner.manifest("test-script")
+
     def test_failure_timeout_log_limits_and_invalid_modes(self):
         self.script('raise RuntimeError("script failed")')
         job = self.finished(self.run_script()["job"]["id"])
@@ -138,7 +145,7 @@ time.sleep(60)
         self.assertEqual(marker.read_text(), value)
 
     def test_frame_broker_owns_session_and_never_passes_token_to_script(self):
-        self.script('from edge_script import result\nresult(42)', ["display"])
+        self.script('from edge_script import result\nresult(42)', ["display.frames"])
         with self.assertRaisesRegex(ValueError, "PIM576"):
             self.run_script()
         with patch.object(self.runner, "display_request", return_value={"ok": True}) as broker:

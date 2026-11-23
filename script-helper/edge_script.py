@@ -38,7 +38,7 @@ def log(message):
 
 
 def frame(image):
-    """Send a Pillow 240x240 image through the runner's exclusive display session."""
+    """Send a Pillow 240x240 image through declared display.frames device access."""
     if image.size != (240, 240):
         raise ValueError("Expected a 240x240 image")
     print(json.dumps({"type": "frame", "rgb": base64.b64encode(image.convert("RGB").tobytes()).decode("ascii")}), flush=True)

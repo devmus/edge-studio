@@ -17,6 +17,10 @@ Setup creates the non-login `edge-studio-code` system account, the fixed source/
 
 The unit uses `NoNewPrivileges`, `PrivateDevices`, `PrivateTmp`, `ProtectSystem=strict` and `ProtectHome`, with writable managed state under `/var/lib/edge-studio-scripts`. These are practical service restrictions, **not isolation between mutually untrusted scripts**. All scripts share one account and network access; capability declarations govern the frame broker, not arbitrary Python behavior. Do not install untrusted code or treat manifests as a permission sandbox. The runner's credentials are omitted from the child environment, but trusted code sharing its account must not be considered isolated from that account's resources.
 
+## Installer reruns and port ownership
+
+Older installers can reject their own running script helper on port 38184: the helper's working directory is the installation's `script-helper` subdirectory, while the old preflight expects the installation root. Updated preflight recognizes that exact service directory and still requires the service PID to own the requested listening socket; unrelated listeners remain conflicts. To finish an update with an older downloaded installer, pause script workflows, stop only `edge-studio-script-helper.service`, then rerun the source installer with `ENABLE_CUSTOM_CODE=true`. This interrupts active scripts; successful setup starts the helper again. Verify the expected installed SHA and helper/container health afterward.
+
 ## Create and store scripts
 
 Keep your code in your own Git repository on your development computer, then copy reviewed releases into:
@@ -37,11 +41,11 @@ The fixed entry point is `main.py`. The manifest's ID must match its directory, 
   "id": "animate-lux",
   "name": "Animate light level",
   "entrypoint": "main.py",
-  "capabilities": ["display"]
+  "capabilities": ["display.frames"]
 }
 ```
 
-Use `"capabilities": []` for scripts that do not need the LCD broker. `requirements.txt` is an operator convention, not something the runner reads. If `.venv/bin/python` exists, it is used; otherwise the system Python interpreter is used. Install dependencies only after reviewing their code/licensing:
+Use `"capabilities": []` for scripts that do not need brokered Device access. `display.frames` makes the workflow show **Device access** and currently accepts configured PIM576 displays only. Existing manifests using the legacy `display` name remain accepted and are reported as `display.frames`. This declaration provisions the narrow frame broker; it does not sandbox trusted Python. `requirements.txt` is an operator convention, not something the runner reads. If `.venv/bin/python` exists, it is used; otherwise the system Python interpreter is used. Install dependencies only after reviewing their code/licensing:
 
 ```bash
 sudo cp -r /opt/edge-studio/script-helper/examples/animate-lux /opt/edge-studio-scripts/animate-lux
@@ -68,7 +72,7 @@ result({"doubled": config["value"] * 2})
 - `inputs()` waits for the next available input; `inputs(wait=False)` returns the newest queued input or `None`. Update-mode scripts must read input messages. A full bounded input queue causes the triggering block to fail rather than buffering indefinitely.
 - `log(message)` writes a structured log line. Plain stdout/stderr is also captured as logs. Logs must never include secrets.
 - `result(value)` publishes a JSON result; the last result is retained. Process exit code determines success, so printing a result then exiting nonzero is a failure.
-- `frame(image)` accepts a Pillow 240×240 image and sends RGB pixels through the runner's display broker. A script declaring `display` requires a selected, enabled PIM576 target; it never needs a competing SPI/GPIO handle. Frames are paced to at most 20/second by the broker, not the workflow scheduler. Actual Pi performance may be lower.
+- `frame(image)` accepts a Pillow 240×240 image and sends RGB pixels through the runner's display broker. A script declaring `display.frames` requires **Device access** to a selected, enabled PIM576 display; it never needs a competing SPI/GPIO handle. Frames are paced to at most 20/second by the broker, not the workflow scheduler. Actual Pi performance may be lower.
 - `EDGE_SCRIPT_DATA_DIR` identifies your persistent per-script directory under `/var/lib/edge-studio-scripts/data/<id>`. Write persistent files there; working directory is the installed script directory, which is read-only under the service policy.
 
 The wire protocol is one JSON object per stdout line: `{"type":"log","message":"..."}`, `{"type":"result","value":...}` or `{"type":"frame","rgb":"<base64 RGB bytes>"}`. Inputs/results are limited to 16 KiB, logs to 16 KiB per job and output lines to 240,000 bytes. Exceeding output limits fails/stops the job. Four jobs may run concurrently. Limits bound normal cooperation; trusted Python can still consume CPU, create files or make network requests outside the SDK.
@@ -79,7 +83,9 @@ The wire protocol is one JSON object per stdout line: `{"type":"log","message":"
 2. Select an installed script and **Execution mode**.
 3. Enter **Inputs JSON**. Exact variable placeholders preserve types, e.g. `{"lux":"{{lux}}"}` sends numeric lux when the variable is numeric.
 4. Set a **Time limit, seconds** from 1 to 3600. Bounded mode requires it (default 30 seconds); background mode allows a blank limit for continuous operation.
-5. If required by the manifest, select the PIM576 **Display target**.
+5. If the manifest declares a supported broker capability, select **Device access**. The list contains only configured devices compatible with that capability; `display.frames` currently supports PIM576 displays.
+
+Scripts without a supported broker capability do not show Device access and receive no device session. A saved target is ignored if the selected script no longer declares the capability. Sensor readings and other workflow data should normally be passed through **Inputs JSON**; selecting a device does not grant a generic device, GPIO or credential API.
 
 **Wait for completion:** the workflow stays active until the job exits. Failure/timeout fails the block. Its output includes `output.job.result`, which a later Set variable block can read through **Workflow context field**. Normal successful-completion change-baseline behavior applies.
 
@@ -111,6 +117,8 @@ The runner keeps at most 1,000 recent terminal job records (active jobs are prot
 
 The LCD is exclusively leased to one job; other scripts and normal text writes receive a busy error. Sessions expire after 15 seconds without renewal. Frames/lease renewals extend them. Stop/exit releases the lease; an expired script cannot write over a new owner. The last frame may remain on screen after release; clearing sensitive content is the script/operator's responsibility.
 
+The first valid frame of a new display session restores the fixed SPI settings, initializes the controller and enables the backlight on the existing hardware handle. Subsequent frames and valid renewals do not reset the animation. Initialization adds approximately 250 ms at the operation boundary. Text output and Test display use the same recovery before each write. If the panel resets during an already-running animation, stop/restart the job to get a fresh session; changing background mode or renewing its lease does not restart the script or reset the controller.
+
 To disable the runner deliberately:
 
 ```bash
@@ -121,7 +129,7 @@ sudo env APP_DIR=/opt/edge-studio python3 /opt/edge-studio/host-agent/edge_studi
 
 Enable SPI displays separately, install the bundled `animate-lux` example, and test:
 
-**Manual run → Set variable `lux` (Custom JSON `12.5`) → Run custom code** with script Animate light level, Wait for completion, 30-second limit, PIM576 target and inputs:
+**Manual run → Set variable `lux` (Custom JSON `12.5`) → Run custom code** with script Animate light level, Wait for completion, 30-second limit, **Device access** set to the PIM576 and inputs:
 
 ```json
 {"lux":"{{lux}}","durationSeconds":5}
@@ -131,6 +139,8 @@ In Set variable, **Custom JSON is the value itself**: enter `12.5`, not `{"value
 
 For failures, use **View error details** in the selected block, **View selected run error** above the canvas, or **Error details** in history. These open the existing workflow error modal, whose **Script jobs** section includes run-linked logs/results and current job status. New failed custom-code runs preserve job metadata and the native error; older runs use retained-job lookup when possible. A previous block's output is never substituted for the script job. Later background failures have their own **View job error details** action in Watch.
 
-For a continuous animation, select Run in background, blank time limit, Update inputs and `{"lux":"{{lux}}","durationSeconds":null}`. The script reads new lux values without restarting the animation. Use a suitable sensor trigger/schedule; one-second triggers reaching custom code exhaust 1,000/hour, so use at least a five-second schedule or change filtering. Check the job and stop/pause deliberately.
+For a continuous animation, select Run in background, blank time limit, Update inputs and `{"lux":"{{lux}}","durationSeconds":null}`. A one-second workflow can read lux and stop at **Changed by at least** when false; only runs that continue to Run custom code consume its 1,000/hour privileged budget. The existing process reads each new lux input without restarting its loop. Check the job and stop/pause deliberately.
+
+For a finite presentation, use Wait for completion with a time limit. A one-minute BME workflow can pass temperature, humidity, pressure and other readings in one input object; the script can display each value for ten seconds and use the remaining time for general sensor information. The workflow remains active until that presentation exits successfully or fails.
 
 Physical verification remains required: visible animation/rotation, text-busy handling, repeated updates, stop/release, runner/backend restart, pause/delete, resource use on the actual Pi and dependency/service repair. Record model/OS, expected/installed SHA, container/service health and sanitized evidence. No actual Pi deployment or display action is implied by the examples.

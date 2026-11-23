@@ -5,7 +5,8 @@ let teardown: () => void;
 let service: typeof import("../../../src/features/custom-code/customCode.service.js");
 let env: typeof import("../../../src/config/env.js").env;
 let repository: typeof import("../../../src/features/automation/automation.repository.js");
-let saved: { enabled: boolean; token: string };
+let dataSources: typeof import("../../../src/features/data-sources/dataSources.repository.js");
+let saved: { enabled: boolean; token: string; displaysEnabled: boolean };
 let owner: { workflowId: string; blockId: string; runId: string };
 const fetch = vi.fn();
 const job = { id: "11111111-1111-4111-8111-111111111111", workflowId: "workflow", blockId: "block", scriptId: "test-script", mode: "bounded", status: "running", logs: "", result: null, error: null };
@@ -16,10 +17,11 @@ beforeAll(async () => {
   env = (await import("../../../src/config/env.js")).env;
   service = await import("../../../src/features/custom-code/customCode.service.js");
   repository = await import("../../../src/features/automation/automation.repository.js");
+  dataSources = await import("../../../src/features/data-sources/dataSources.repository.js");
 });
 afterAll(() => teardown());
 beforeEach(() => {
-  saved = { enabled: env.customCodeEnabled, token: env.scriptHelperToken };
+  saved = { enabled: env.customCodeEnabled, token: env.scriptHelperToken, displaysEnabled: env.displaysEnabled };
   env.customCodeEnabled = true;
   env.scriptHelperToken = "test-runner-token";
   const workflow = repository.createAutomationWorkflow({ name: "Script owner", enabled: false, blocks: [{ type: "run_custom_code", config: { scriptId: "test-script" } }] });
@@ -37,6 +39,7 @@ afterEach(() => {
   repository.updateAutomationWorkflow(owner.workflowId, { enabled: false });
   env.customCodeEnabled = saved.enabled;
   env.scriptHelperToken = saved.token;
+  env.displaysEnabled = saved.displaysEnabled;
   vi.unstubAllGlobals();
 });
 
@@ -66,6 +69,31 @@ describe("custom-code runner boundary", () => {
     expect(result.job.status).toBe("running");
     expect(fetch.mock.calls.some(([url]) => url.includes("/jobs/"))).toBe(false);
     expect(JSON.parse(fetch.mock.calls.find(([url]) => url.endsWith("/run"))![1].body)).toMatchObject({ mode: "background", onRunning: "update", timeoutSeconds: null });
+  });
+
+  it("resolves declared frame Device access while ignoring stale access for general scripts", async () => {
+    const target = dataSources.createDataSource({ name: "Screen", type: "spi-display", config: { model: "pim576", rotation: 90 } });
+    env.displaysEnabled = true;
+    const original = fetch.getMockImplementation()!;
+    fetch.mockImplementation(async (url: string, init: RequestInit) => url.endsWith("/scripts")
+      ? Response.json({ items: [{ id: "test-script", name: "Test", capabilities: ["display.frames"] }], errors: [] })
+      : original(url, init));
+    await service.runCustomCode({ scriptId: "test-script", targetId: target.id }, owner, {});
+    expect(JSON.parse(fetch.mock.calls.find(([url]) => url.endsWith("/run"))![1].body).display).toEqual({ model: "pim576", rotation: 90 });
+
+    fetch.mockClear().mockImplementation(original);
+    await service.runCustomCode({ scriptId: "test-script", targetId: target.id }, owner, {});
+    expect(JSON.parse(fetch.mock.calls.find(([url]) => url.endsWith("/run"))![1].body).display).toBeUndefined();
+  });
+
+  it("requires compatible Device access for frame-capable scripts", async () => {
+    const original = fetch.getMockImplementation()!;
+    fetch.mockImplementation(async (url: string, init: RequestInit) => url.endsWith("/scripts")
+      ? Response.json({ items: [{ id: "test-script", name: "Test", capabilities: ["display.frames"] }], errors: [] })
+      : original(url, init));
+    env.displaysEnabled = true;
+    await expect(service.runCustomCode({ scriptId: "test-script" }, owner, {})).rejects.toThrow(/Device access/);
+    expect(fetch.mock.calls.filter(([url]) => url.endsWith("/run"))).toHaveLength(0);
   });
 
   it("fails the waiting workflow on a later script error", async () => {

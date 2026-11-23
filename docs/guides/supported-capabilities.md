@@ -61,7 +61,7 @@ Webhook, MQTT and GPIO listeners operate while enabled workflows need them. They
 | GPIO LED | Control a low-current LED through a GPIO pin | GPIO enabled, safe wiring and series resistor; **Control device**; test with **Test pulse** first | Prototype test documented; [GPIO18 LED](./gpio-device-settings.md#output-led-on-gpio18) |
 | HTTP JSON Target | Send requests/payloads to an HTTP endpoint; also supports configured multipart media uploads | Reachable allowed URL and a compatible receiving endpoint; **Control device** | Protocol integration; [test example](./tester-device-workflows.md#test-with-a-pc) |
 | MQTT Publisher | Publish JSON to a broker/topic | Reachable broker and compatible receiver; **Control device** | Protocol integration; [test example](./tester-device-workflows.md#test-with-a-pc) |
-| PIM576 SPI LCD | Display title/text on Pimoroni's 1.54-inch 240×240 SPI screen | SPI displays enabled; fixed SPI0 CE0/DC GPIO25/BL GPIO24 wiring; **Control device → Display text** with a custom variable | Physical evidence not recorded here; [setup and verification status](./pim576-display.md#verification-status) |
+| PIM576 SPI LCD | Display title/text on Pimoroni's 1.54-inch 240×240 SPI screen | SPI displays enabled; fixed SPI0 CE0/DC GPIO25/BL GPIO24 wiring; **Control device → Display text** with a custom variable | Contributor-reported workflow recovery after a helper restart; complete checklist and automatic reinitialization still pending; [setup and verification status](./pim576-display.md#verification-status) |
 
 Outputs do not become readable inputs. Generic GPIO access does not establish support for motors, relays or mains equipment.
 
@@ -85,7 +85,7 @@ These are the current toolkit names. Some older guides call **Control device** �
 | Action | Show preview | Create a local Workflow Inbox item | Text, JSON, links or image references from configured content/context; not an external notification service |
 | Action | Control device | Send an output command | GPIO LED, HTTP JSON Target, MQTT Publisher or PIM576 SPI LCD; actual effect depends on target/action |
 | Action | Send payment | Send native MINIMA to a saved recipient | Available Minima node, usable address book recipient and funds; current workflow payments use native MINIMA (`0x00`) |
-| Action | Run custom code | Run installed Python, waiting for completion or managing a background job | Opt-in non-root script runner; trusted installed scripts; JSON inputs/results, job status/stop and optional exclusive LCD frames; see [setup and animation example](./custom-code.md) |
+| Action | Run custom code | Run installed Python, waiting for completion or managing a background job | Opt-in non-root script runner; trusted installed scripts; JSON inputs/results, job status/stop and capability-filtered Device access (currently exclusive PIM576 frames); see [setup and animation example](./custom-code.md) |
 | Attached | Stamp data | Create an Integritas proof for a data hash | Attach to Record trigger event, Fetch data source or Capture camera; configured Integritas access required |
 
 Workflows execute an ordered sequence. Add one start block first; device-dependent blocks may be unavailable until a suitable device exists. Stamping attaches to a data block rather than adding a separate final step. Validation checks configuration and dependencies before execution; it does not prove physical wiring or external service behaviour. Payments, outputs and capture perform real actions when run.

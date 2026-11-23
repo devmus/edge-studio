@@ -262,7 +262,8 @@ def helper_owns_port(service, port, app_dir):
         return False
     try:
         proc = Path("/proc") / pid
-        if os.path.realpath(proc / "cwd") != app_dir:
+        expected_cwd = f"{app_dir}/script-helper" if service == "edge-studio-script-helper.service" else app_dir
+        if os.path.realpath(proc / "cwd") != expected_cwd:
             return False
         sockets = {os.readlink(fd) for fd in (proc / "fd").iterdir()}
         for table in (Path("/proc/net/tcp"), Path("/proc/net/tcp6")):

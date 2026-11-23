@@ -809,6 +809,7 @@ function DomainBlockInputSummary({
       { label: "Script", value: block.config.scriptId || "Not selected" },
       { label: "Mode", value: block.config.executionMode === "background" ? "Run in background" : "Wait for completion" },
       { label: "Inputs", value: block.config.inputsJsonText ?? "{}" },
+      ...(block.config.targetId ? [{ label: "Device access ID", value: block.config.targetId }] : []),
     ]} />;
   }
 

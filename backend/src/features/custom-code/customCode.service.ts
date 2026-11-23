@@ -61,6 +61,22 @@ export async function listCustomScripts() {
   return request<{ items: Script[]; errors: { id: string; error: string }[] }>("/scripts");
 }
 
+export function requiresFrameDeviceAccess(script: Script) {
+  return script.capabilities.includes("display.frames") || script.capabilities.includes("display");
+}
+
+export function customCodeDeviceAccessError(script: Script, config: CustomCodeConfig): string | null {
+  if (!requiresFrameDeviceAccess(script)) return null;
+  const target = config.targetId ? getDataSource(config.targetId) : undefined;
+  if (!env.displaysEnabled || target?.type !== "spi-display") return "This script requires Device access to an enabled PIM576 display.";
+  try {
+    parseSpiDisplayConfig(JSON.parse(target.config) as unknown);
+  } catch {
+    return "This script requires Device access to a valid PIM576 display.";
+  }
+  return null;
+}
+
 export async function listCustomCodeJobs(filter: { workflowId?: string; runId?: string; blockId?: string } = {}) {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(filter)) {
@@ -119,12 +135,10 @@ export async function runCustomCode(config: CustomCodeConfig, owner: { workflowI
   const scripts = await listCustomScripts();
   const script = scripts.items.find((item) => item.id === config.scriptId);
   if (!script) throw new Error("Script is missing or invalid. Refresh installed scripts.");
-  let display;
-  if (script.capabilities.includes("display")) {
-    const target = config.targetId ? getDataSource(config.targetId) : undefined;
-    if (!env.displaysEnabled || target?.type !== "spi-display") throw new Error("This script requires enabled SPI displays and a configured PIM576 target");
-    display = parseSpiDisplayConfig(JSON.parse(target.config) as unknown);
-  }
+  const accessError = customCodeDeviceAccessError(script, config);
+  if (accessError) throw new Error(accessError);
+  const target = requiresFrameDeviceAccess(script) && config.targetId ? getDataSource(config.targetId) : undefined;
+  const display = target ? parseSpiDisplayConfig(JSON.parse(target.config) as unknown) : undefined;
   await ensureSession();
   if (!isCurrent()) throw new Error("Workflow or script block changed before execution");
   const key = `${owner.workflowId}:${owner.blockId}`;

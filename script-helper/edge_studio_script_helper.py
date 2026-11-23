@@ -74,9 +74,10 @@ class Runner:
         capabilities = config.get("capabilities", [])
         if not isinstance(name, str) or not name.strip() or len(name) > 100:
             raise ValueError("Script name must contain 1 to 100 characters")
-        if not isinstance(capabilities, list) or any(item != "display" for item in capabilities):
-            raise ValueError("Supported capability: display")
-        return {"id": script_id, "name": name, "capabilities": capabilities}
+        if not isinstance(capabilities, list) or any(item not in ("display", "display.frames") for item in capabilities):
+            raise ValueError("Supported capability: display.frames")
+        normalized = list(dict.fromkeys("display.frames" if item == "display" else item for item in capabilities))
+        return {"id": script_id, "name": name, "capabilities": normalized}
 
     def scripts(self):
         items, errors = [], []
@@ -134,11 +135,11 @@ class Runner:
         if not isinstance(payload.get("session"), str) or payload["session"] != self.session:
             raise ValueError("Backend session has not been reconciled")
         display = payload.get("display")
-        if "display" in manifest["capabilities"]:
+        if "display.frames" in manifest["capabilities"]:
             if not isinstance(display, dict) or display.get("model") != "pim576" or type(display.get("rotation")) is not int or display["rotation"] not in (0, 90, 180, 270):
                 raise ValueError("This script requires a configured PIM576 display")
         elif display is not None:
-            raise ValueError("Script does not declare display capability")
+            raise ValueError("Script does not declare display.frames capability")
         with self.lock:
             existing = next((job for job in self.active.values() if (job["record"]["workflowId"], job["record"]["blockId"]) == owner), None)
             if existing:

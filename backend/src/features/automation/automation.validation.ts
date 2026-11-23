@@ -1,5 +1,5 @@
 import { env } from "../../config/env.js";
-import { customCodeConfigError, listCustomScripts, type CustomCodeConfig } from "../custom-code/customCode.service.js";
+import { customCodeConfigError, customCodeDeviceAccessError, listCustomScripts, type CustomCodeConfig } from "../custom-code/customCode.service.js";
 import { getAddressBookEntryById } from "../address-book/address-book.repository.js";
 import { getCameraCapability } from "../data-sources/cameraCapture.service.js";
 import { getDisplayCapability } from "../data-sources/displayOutput.service.js";
@@ -150,7 +150,10 @@ async function validateAutomationBlockGraph(blocks: ValidationBlock[]): Promise<
         try {
           const script = (await listCustomScripts()).items.find((item) => item.id === config.scriptId);
           if (!script) addIssue(issues, "error", "custom_code.missing_script", "Installed script is missing or invalid.", block);
-          else if (script.capabilities.includes("display") && (!env.displaysEnabled || !config.targetId || getDataSource(config.targetId)?.type !== "spi-display")) addIssue(issues, "error", "custom_code.missing_display", "Script requires enabled SPI displays and a PIM576 target.", block);
+          else {
+            const accessError = customCodeDeviceAccessError(script, config);
+            if (accessError) addIssue(issues, "error", "custom_code.missing_device_access", accessError, block);
+          }
         } catch { addIssue(issues, "error", "custom_code.unavailable", "Script runner is unavailable.", block); }
       }
     }

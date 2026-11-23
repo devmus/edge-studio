@@ -261,6 +261,29 @@ class PreflightTests(unittest.TestCase):
                 self.assertEqual(check(values), 1)
             self.assertIn("Minima RPC", output.getvalue())
 
+    def test_script_helper_requires_its_exact_service_directory_and_listener_inode(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "123" / "fd").mkdir(parents=True)
+            (root / "123" / "fd" / "5").touch()
+            (root / "net").mkdir()
+            (root / "net" / "tcp").write_text("header\\n 0: 00000000:9528 00000000:0000 0A 0:0 0:0 0 0 0 456\\n")
+            def proc_path(value):
+                return root / value.removeprefix("/proc").lstrip("/")
+            realpath = scope["os"].path.realpath
+            def cwd_path(value):
+                return "/opt/edge-studio/script-helper" if str(value).endswith("cwd") else realpath(value)
+            with patch.dict(scope, command=lambda _: "123", Path=proc_path):
+                with patch.object(scope["os"].path, "realpath", side_effect=cwd_path), patch.object(scope["os"], "readlink", return_value="socket:[456]"):
+                    self.assertTrue(scope["helper_owns_port"]("edge-studio-script-helper.service", 38184, "/opt/edge-studio"))
+                    self.assertFalse(scope["helper_owns_port"]("edge-studio-host-agent.service", 38184, "/opt/edge-studio"))
+                    self.assertFalse(scope["helper_owns_port"]("edge-studio-script-helper.service", 38184, "/another-install"))
+                    self.assertFalse(scope["helper_owns_port"]("edge-studio-script-helper.service", 38183, "/opt/edge-studio"))
+                with patch.object(scope["os"].path, "realpath", side_effect=cwd_path), patch.object(scope["os"], "readlink", return_value="socket:[999]"):
+                    self.assertFalse(scope["helper_owns_port"]("edge-studio-script-helper.service", 38184, "/opt/edge-studio"))
+
 unittest.main()
 `,
     });

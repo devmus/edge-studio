@@ -5,6 +5,7 @@ import { setupTestDatabase } from "../../helpers/testDatabase.js";
 const {
   getDataSourceMock,
   parseGpioOutputConfigMock,
+  parseSpiDisplayConfigMock,
   getAddressBookEntryByIdMock,
   getIntegritasApiKeyMock,
   getWalletStatusMock,
@@ -14,6 +15,7 @@ const {
 } = vi.hoisted(() => ({
   getDataSourceMock: vi.fn(),
   parseGpioOutputConfigMock: vi.fn(),
+  parseSpiDisplayConfigMock: vi.fn(),
   getAddressBookEntryByIdMock: vi.fn(),
   getIntegritasApiKeyMock: vi.fn(),
   getWalletStatusMock: vi.fn(),
@@ -27,7 +29,8 @@ vi.mock("../../../src/features/data-sources/dataSources.repository.js", () => ({
 }));
 
 vi.mock("../../../src/features/data-sources/dataSources.service.js", () => ({
-  parseGpioOutputConfig: parseGpioOutputConfigMock
+  parseGpioOutputConfig: parseGpioOutputConfigMock,
+  parseSpiDisplayConfig: parseSpiDisplayConfigMock
 }));
 
 vi.mock("../../../src/features/address-book/address-book.repository.js", () => ({
@@ -74,6 +77,7 @@ afterAll(() => {
 beforeEach(() => {
   getDataSourceMock.mockReset();
   parseGpioOutputConfigMock.mockReset();
+  parseSpiDisplayConfigMock.mockReset().mockImplementation((config) => config);
   getAddressBookEntryByIdMock.mockReset();
   getIntegritasApiKeyMock.mockReset();
   getWalletStatusMock.mockReset();
@@ -427,6 +431,31 @@ describe("validateAutomationDraft — block references", () => {
 });
 
 describe("validateAutomationDraft — hardware dependencies", () => {
+  it("requires capability-compatible Device access for custom frame scripts", async () => {
+    const saved = {
+      customCodeEnabled: env.customCodeEnabled,
+      scriptHelperToken: env.scriptHelperToken,
+      displaysEnabled: env.displaysEnabled,
+      displayHelperToken: env.displayHelperToken,
+    };
+    env.customCodeEnabled = true;
+    env.scriptHelperToken = "script-token";
+    env.displaysEnabled = true;
+    env.displayHelperToken = "display-token";
+    getDataSourceMock.mockImplementation((id: string) => id === "lcd" ? { id, type: "spi-display", config: '{"model":"pim576","rotation":0}' } : undefined);
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(async (url: string) => url.endsWith("/scripts")
+      ? Response.json({ items: [{ id: "animation", name: "Animation", capabilities: ["display.frames"] }], errors: [] })
+      : Response.json({ available: true, supportedModels: ["pim576"] })));
+    try {
+      const configured = block({ clientId: "code", type: "run_custom_code", config: { scriptId: "animation", targetId: "lcd" } });
+      expectNoError(await validation.validateAutomationDraft([manualStart(), configured]), "custom_code.missing_device_access");
+      expectError(await validation.validateAutomationDraft([manualStart(), { ...configured, config: { scriptId: "animation" } }]), "custom_code.missing_device_access");
+    } finally {
+      Object.assign(env, saved);
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("validates display JSON/action and the opt-in helper before execution", async () => {
     getDataSourceMock.mockReturnValue({ id: "lcd", type: "spi-display", config: '{"model":"pim576","rotation":0}' });
     const displayBlock = block({ clientId: "display", type: "control_output", config: { targetId: "lcd", action: "display_text", bodyMode: "custom", bodyTemplateText: '{"text":"Hello"}' } });

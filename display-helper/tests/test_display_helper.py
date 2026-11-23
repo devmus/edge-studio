@@ -18,6 +18,82 @@ spec.loader.exec_module(helper)
 
 
 class DisplayTests(unittest.TestCase):
+    def test_text_write_recovers_cached_controller_and_spi_state_without_reallocating_gpio(self):
+        display = helper.DisplayHelper()
+        panel = self.driver.ST7789.return_value
+        display.display = panel
+        panel._spi.mode = 3
+        panel._spi.lsbfirst = True
+        panel._spi.max_speed_hz = 1000000
+        state = {"initialized": False, "backlight": False, "visible": None}
+        def initialize():
+            self.assertEqual((panel._spi.mode, panel._spi.lsbfirst, panel._spi.max_speed_hz), (0, False, 16000000))
+            state["initialized"] = True
+        def backlight(value):
+            state["backlight"] = value
+        def write(image):
+            if state["initialized"] and state["backlight"]:
+                state["visible"] = image.tobytes()
+        panel._init.side_effect = initialize
+        panel.set_backlight.side_effect = backlight
+        panel.display.side_effect = write
+        payload = {"config": {"model": "pim576"}, "content": {"text": "Recovered"}}
+        display.update(payload)
+        self.assertIsNotNone(state["visible"])
+        state.update(initialized=False, backlight=False, visible=None)
+        display.update(payload)
+        self.assertIsNotNone(state["visible"])
+        self.assertEqual(panel._init.call_count, 2)
+        self.driver.ST7789.assert_not_called()
+
+    def test_new_animation_initializes_on_first_frame_only_and_renewal_preserves_state(self):
+        display = helper.DisplayHelper()
+        panel = self.driver.ST7789.return_value
+        display.display = panel
+        payload = {"owner": "job-one", "config": {"model": "pim576", "rotation": 0}}
+        frame = {"owner": "job-one", "rgb": base64.b64encode(Image.new("RGB", (240, 240), "red").tobytes()).decode()}
+        with patch.object(helper.time, "monotonic", return_value=100):
+            display.acquire(payload)
+            panel._init.assert_not_called()
+            with self.assertRaises(ValueError):
+                display.frame({**frame, "owner": "wrong-job"})
+            with self.assertRaises(ValueError):
+                display.frame({**frame, "rgb": "invalid"})
+            panel._init.assert_not_called()
+            display.frame(frame)
+            display.frame(frame)
+            self.assertEqual(panel._init.call_count, 1)
+        with patch.object(helper.time, "monotonic", return_value=110):
+            display.acquire(payload)
+            display.frame(frame)
+            self.assertEqual(panel._init.call_count, 1)
+        with patch.object(helper.time, "monotonic", return_value=126):
+            display.acquire(payload)
+            display.frame(frame)
+            self.assertEqual(panel._init.call_count, 2)
+        display.release({"owner": "job-one"})
+        display.acquire({**payload, "owner": "job-two"})
+        display.frame({**frame, "owner": "job-two"})
+        self.assertEqual(panel._init.call_count, 3)
+        self.driver.ST7789.assert_not_called()
+
+    def test_failed_initialization_does_not_write_a_frame_or_mark_the_session_prepared(self):
+        display = helper.DisplayHelper()
+        panel = self.driver.ST7789.return_value
+        display.display = panel
+        payload = {"owner": "job-one", "config": {"model": "pim576"}}
+        frame = {"owner": "job-one", "rgb": base64.b64encode(Image.new("RGB", (240, 240), "red").tobytes()).decode()}
+        display.acquire(payload)
+        panel._init.side_effect = OSError("SPI unavailable")
+        with self.assertRaisesRegex(OSError, "SPI unavailable"):
+            display.frame(frame)
+        panel.display.assert_not_called()
+        display.acquire(payload)
+        panel._init.side_effect = None
+        display.frame(frame)
+        self.assertEqual(panel._init.call_count, 2)
+        panel.display.assert_called_once()
+
     def test_exclusive_frame_session_blocks_text_other_jobs_and_expired_writers(self):
         display = helper.DisplayHelper()
         config = {"model": "pim576", "rotation": 90}
@@ -70,8 +146,9 @@ class DisplayTests(unittest.TestCase):
             self.assertEqual(result["rotation"], rotation)
         self.driver.ST7789.assert_called_once_with(port=0, cs=0, dc=25, backlight=24, width=240, height=240, rotation=0, spi_speed_hz=16000000, offset_left=0, offset_top=0)
         self.assertEqual(self.driver.ST7789.return_value.display.call_count, 4)
+        self.assertEqual(self.driver.ST7789.return_value._init.call_count, 3)
         display.close()
-        self.driver.ST7789.return_value.set_backlight.assert_called_once_with(False)
+        self.assertEqual([call.args[0] for call in self.driver.ST7789.return_value.set_backlight.call_args_list], [True, True, True, False])
 
     def test_invalid_requests_do_not_initialize_or_write_hardware(self):
         display = helper.DisplayHelper()

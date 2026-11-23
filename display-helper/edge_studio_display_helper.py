@@ -86,7 +86,10 @@ class DisplayHelper:
             session = self.active_session()
             if session and session["owner"] != owner:
                 raise ValueError("Display is in use by a custom script")
-            self.session = {"owner": owner, "rotation": rotation, "expires": time.monotonic() + 15}
+            if session:
+                session.update(rotation=rotation, expires=time.monotonic() + 15)
+            else:
+                self.session = {"owner": owner, "rotation": rotation, "expires": time.monotonic() + 15, "has_frame": False}
         return {"ok": True}
 
     def release(self, payload):
@@ -95,12 +98,19 @@ class DisplayHelper:
                 self.session = None
         return {"ok": True}
 
-    def write_image(self, image):
+    def write_image(self, image, reinitialize=False):
         if self.display is None:
             st7789, _, _, _ = display_modules()
             self.display = st7789.ST7789(port=0, cs=0, dc=25, backlight=24,
                                        width=240, height=240, rotation=0,
                                        spi_speed_hz=16000000, offset_left=0, offset_top=0)
+        elif reinitialize:
+            # Pinned ST7789 1.0.1 controller initialization; see ADR 0019.
+            self.display._spi.mode = 0
+            self.display._spi.lsbfirst = False
+            self.display._spi.max_speed_hz = 16000000
+            self.display._init()
+            self.display.set_backlight(True)
         self.display.display(image)
 
     def frame(self, payload):
@@ -116,7 +126,8 @@ class DisplayHelper:
             session = self.active_session()
             if not session or session["owner"] != payload.get("owner"):
                 raise ValueError("Display session has expired or belongs to another job")
-            self.write_image(image.rotate(session["rotation"]))
+            self.write_image(image.rotate(session["rotation"]), reinitialize=not session["has_frame"])
+            session["has_frame"] = True
             session["expires"] = time.monotonic() + 15
         return {"ok": True}
 
@@ -135,7 +146,7 @@ class DisplayHelper:
         with self.lock:
             if self.active_session():
                 raise ValueError("Display is in use by a custom script; stop its job before writing text")
-            self.write_image(image)
+            self.write_image(image, reinitialize=True)
         return {"model": "pim576", "rotation": rotation, "title": title, "text": text}
 
     def close(self):

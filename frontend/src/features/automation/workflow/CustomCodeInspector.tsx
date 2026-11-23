@@ -11,6 +11,10 @@ import { InspectorSection, formGridClass, mutedText } from "./workflowWorkspaceU
 
 type Script = { id: string; name: string; capabilities: string[] };
 
+function requiresFrameDeviceAccess(script: Script | undefined) {
+  return script?.capabilities.some((capability) => capability === "display.frames" || capability === "display") ?? false;
+}
+
 export function CustomCodeInspector({ config, sources, onChange }: {
   config: AutomationBlock["config"];
   sources: DataSource[];
@@ -37,6 +41,8 @@ export function CustomCodeInspector({ config, sources, onChange }: {
   }, [refresh]);
   const background = config.executionMode === "background";
   const selected = scripts.find((script) => script.id === config.scriptId);
+  const compatibleDevices = sources.filter((source) => source.type === "spi-display" && source.config.model === "pim576");
+  const selectedDevice = compatibleDevices.find((source) => source.id === config.targetId);
   return <InspectorSection title="Configuration" className={formGridClass}>
     <p className={mutedText}>Runs trusted installed Python, not a sandbox. Source lives in /opt/edge-studio-scripts. <a href="https://github.com/edge-studio-technology/edge-studio/blob/dev/docs/guides/custom-code.md" target="_blank" rel="noreferrer">Setup guide</a></p>
     {loading && <p className={mutedText}>Loading installed scripts…</p>}
@@ -56,8 +62,8 @@ export function CustomCodeInspector({ config, sources, onChange }: {
       onChange={(event) => onChange({ ...config, timeoutSeconds: event.target.value === "" ? null : Number(event.target.value) })} />
     <TextareaField label="Inputs JSON" value={config.inputsJsonText ?? "{}"}
       onChange={(event) => onChange({ ...config, inputsJsonText: event.target.value })} />
-    {selected?.capabilities.includes("display") && <SelectField label="Display target" value={config.targetId ?? ""} placeholder="Select PIM576…"
-      options={sources.filter((source) => source.type === "spi-display").map((source) => ({ value: source.id, label: source.name }))}
+    {requiresFrameDeviceAccess(selected) && <SelectField label="Device access" description="This script can send frames only to a compatible configured device." value={config.targetId ?? ""} placeholder="Select compatible device…"
+      options={[...compatibleDevices.map((source) => ({ value: source.id, label: source.name })), ...(config.targetId && !selectedDevice ? [{ value: config.targetId, label: `${config.targetId} (missing or incompatible)` }] : [])]}
       onChange={(event) => onChange({ ...config, targetId: event.target.value })} />}
     {background && <p className={mutedText}>Enable the workflow before starting a background job. Workflow success means started. Later errors appear on the job. Updates require the script to read input messages. Pausing/deleting the workflow stops its jobs; interrupted jobs are not automatically resumed.</p>}
     <p className={mutedText}>Inspect job status, logs and results in Watch mode by selecting a historic run.</p>

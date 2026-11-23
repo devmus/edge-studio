@@ -2,5 +2,5 @@
   "id": "animate-lux",
   "name": "Animate light level",
   "entrypoint": "main.py",
-  "capabilities": ["display"]
+  "capabilities": ["display.frames"]
 }

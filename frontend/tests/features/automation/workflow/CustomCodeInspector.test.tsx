@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CustomCodeInspector } from "../../../../src/features/automation/workflow/CustomCodeInspector";
+import type { DataSource } from "../../../../src/features/data-sources/dataSourceTypes";
 
 const fetch = vi.fn();
 beforeEach(() => {
@@ -39,6 +40,25 @@ describe("custom-code block configuration", () => {
     await userEvent.click(screen.getByRole("button", { name: "Refresh scripts" }));
     await waitFor(() => expect(fetch.mock.calls.length).toBeGreaterThan(previous));
     expect(fetch.mock.calls.every(([url]) => url === "/api/custom-code/scripts")).toBe(true);
+  });
+
+  it("shows capability-filtered Device access only for scripts that require it", async () => {
+    fetch.mockResolvedValue(Response.json({ items: [{ id: "animate-lux", name: "Animate light level", capabilities: ["display.frames"] }], errors: [] }));
+    const display = { id: "lcd", name: "Desk display", type: "spi-display", config: { model: "pim576", rotation: 0 } } as DataSource;
+    const gpio = { id: "led", name: "Status LED", type: "gpio-output", config: { pin: 18 } } as DataSource;
+    const onChange = vi.fn();
+    render(<CustomCodeInspector config={{ scriptId: "animate-lux" }} sources={[display, gpio]} onChange={onChange} />);
+    const access = await screen.findByRole("combobox", { name: "Device access" });
+    expect(screen.getByRole("option", { name: "Desk display" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Status LED" })).not.toBeInTheDocument();
+    await userEvent.selectOptions(access, "lcd");
+    expect(onChange).toHaveBeenCalledWith({ scriptId: "animate-lux", targetId: "lcd" });
+  });
+
+  it("hides Device access for general scripts even when a stale target is saved", async () => {
+    render(<CustomCodeInspector config={{ scriptId: "animate-lux", targetId: "old-device" }} sources={[]} onChange={vi.fn()} />);
+    await screen.findByRole("option", { name: "Animate light level" });
+    expect(screen.queryByRole("combobox", { name: "Device access" })).not.toBeInTheDocument();
   });
 
   it("preserves a missing selection and explains unavailable support", async () => {
