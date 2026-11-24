@@ -98,7 +98,7 @@ Each condition stores its baseline in SQLite, separately from run history. It su
 
 Workflows whose enabled privileged actions are all SPI display text outputs have a fixed budget of **5,000 runs per rolling hour**. Reads, variables and logic do not disqualify them. Adding a payment, camera, stamp or another kind of output keeps the existing **1,000/hour** limit. The same persisted ledger is retained across edits; filtered runs that stop before any privileged action consume no slot, while a failed output consumes one.
 
-Filtering avoids display writes, not sensor reads or run records. One-second polling can create **86,400 reads and runs per day**. Review **Settings → Storage & history** retention; automatic cleanup remains off until explicitly enabled. Physical timing, repeated updates and failure/recovery for this workflow still require Pi verification.
+Filtering avoids display writes and sensor reads still occur. One-second polling can create **86,400 reads per day**. Repeated unchanged workflow checks are grouped into hourly no-action activity summaries unless temporary Developer diagnostics is enabled. Review **Settings → Storage & history** for read retention; automatic cleanup remains off until explicitly enabled. Physical timing, repeated updates and failure/recovery for this workflow still require Pi verification.
 
 ## Failure and privacy behaviour
 

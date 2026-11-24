@@ -1,4 +1,6 @@
 import { env } from "../../config/env.js";
+import { redactDeep } from "../../shared/redact.js";
+import { isDeveloperDiagnosticsEnabled } from "../settings/developerDiagnostics.service.js";
 
 type HostCapabilityState = "disabled" | "applying" | "enabled" | "failed" | "needs_reboot" | "missing_prerequisites";
 
@@ -120,8 +122,8 @@ function fallbackCapabilities(reason: string): HostAgentListResponse {
 }
 
 function debugHostCapability(event: string, pathname: string, details?: unknown) {
-  if (!env.hostCapabilityDebug) return;
-  console.log(`[host-capabilities] ${event} ${pathname}`, details ?? "");
+  if (!env.hostCapabilityDebug && !isDeveloperDiagnosticsEnabled()) return;
+  console.log(`[host-capabilities] ${event} ${pathname}`, details === undefined ? "" : redactDeep(details));
 }
 
 function fallbackCameraCapability(reason: string): HostCapability {

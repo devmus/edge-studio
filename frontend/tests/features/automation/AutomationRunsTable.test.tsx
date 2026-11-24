@@ -81,6 +81,18 @@ describe("AutomationRunsTable", () => {
     expectRowActionsPinned(screen.getByRole("table", { name: "Workflow logs" }));
   });
 
+  it("renders compacted no-action checks as one activity row", () => {
+    renderTable({ runs: [run({
+      triggerType: "schedule",
+      outcome: "no_action",
+      occurrenceCount: 42,
+      lastOccurrenceAt: "2026-08-01T00:10:00.000Z",
+    })] });
+    const table = screen.getByRole("table", { name: "Workflow logs" });
+    expect(within(table).getByText("42 scheduled checks")).toBeInTheDocument();
+    expect(within(table).getByText("No action")).toBeInTheDocument();
+  });
+
   it("hides the Workflow column in compact mode", () => {
     renderTable({ runs: [run()], compact: true });
     const table = screen.getByRole("table", { name: "Workflow logs" });

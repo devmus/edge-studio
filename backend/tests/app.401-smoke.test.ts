@@ -77,6 +77,8 @@ const adminOnlyRoutes: [method: "get" | "post" | "patch" | "delete", path: strin
   ["get", "/api/retention/settings"],
   ["post", "/api/retention/settings/preview"],
   ["post", "/api/retention/settings"],
+  ["get", "/api/settings/developer-diagnostics"],
+  ["post", "/api/settings/developer-diagnostics"],
   ["post", "/api/data-sources/src-1/read"],
   ["post", "/api/data-sources"],
   ["post", "/api/minima/config"],

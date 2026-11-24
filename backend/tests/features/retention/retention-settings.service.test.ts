@@ -377,6 +377,20 @@ describe("configured retention eligibility and deletion", () => {
     assert.ok(db.prepare("SELECT id FROM automation_runs WHERE id='busy-059'").get());
   });
 
+  it("ranks workflow summaries by their latest represented activity", () => {
+    workflow("activity");
+    run("older-summary", "activity", old);
+    run("newer-run", "activity", current);
+    db.prepare("UPDATE automation_runs SET last_occurrence_at = ? WHERE id = 'older-summary'")
+      .run(new Date(now + 1000).toISOString());
+
+    const oneRunPolicy = { ...policy, runsPerWorkflow: 1 };
+    assert.equal(repository.previewConfiguredRetention(oneRunPolicy, now).automationRuns, 1);
+    repository.pruneConfiguredRetention(oneRunPolicy, 500, now);
+    assert.ok(db.prepare("SELECT id FROM automation_runs WHERE id = 'older-summary'").get());
+    assert.equal(db.prepare("SELECT id FROM automation_runs WHERE id = 'newer-run'").get(), undefined);
+  });
+
   it("uses age only for deleted-workflow runs and never prunes active runs", () => {
     workflow("active");
     const active = runs.createAutomationRun({

@@ -117,6 +117,10 @@ export function runMigrations() {
       trigger_payload_json TEXT,
       duration_ms INTEGER,
       block_count INTEGER NOT NULL DEFAULT 0,
+      outcome TEXT NOT NULL DEFAULT 'completed',
+      occurrence_count INTEGER NOT NULL DEFAULT 1,
+      last_occurrence_at TEXT,
+      coalesce_key TEXT,
       error TEXT,
       FOREIGN KEY (workflow_id) REFERENCES automation_workflows(id) ON DELETE SET NULL
     )
@@ -166,6 +170,11 @@ export function runMigrations() {
 
   migrateAutomationRunsToPreserveDeletedWorkflows();
 
+  ensureColumn("automation_runs", "outcome", "TEXT NOT NULL DEFAULT 'completed'");
+  ensureColumn("automation_runs", "occurrence_count", "INTEGER NOT NULL DEFAULT 1");
+  ensureColumn("automation_runs", "last_occurrence_at", "TEXT");
+  ensureColumn("automation_runs", "coalesce_key", "TEXT");
+
   const logColumns = db.prepare("PRAGMA table_info(automation_block_runs)").all() as { name: string }[];
   if (!logColumns.some((column) => column.name === "config_json")) {
     db.transaction(() => {
@@ -177,6 +186,8 @@ export function runMigrations() {
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_automation_runs_status_started
       ON automation_runs(status, started_at);
+    CREATE INDEX IF NOT EXISTS idx_automation_runs_workflow_activity
+      ON automation_runs(workflow_id, last_occurrence_at DESC, started_at DESC);
     CREATE INDEX IF NOT EXISTS idx_automation_runs_started
       ON automation_runs(started_at);
     CREATE INDEX IF NOT EXISTS idx_automation_block_runs_run_id

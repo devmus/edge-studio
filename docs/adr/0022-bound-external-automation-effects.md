@@ -96,6 +96,8 @@ Integritas history is evidence. A security limit should not decide their product
 - Persist an allowlisted configuration snapshot and block-specific input/result, with the trigger payload owned once by the parent run. Historic inspection uses recorded settings, not today's mutable workflow definition. Execution context and outward payload generation remain independent of diagnostic snapshots.
 - Apply shared redaction before storage, including parsed JSON template fields. Replace oversized diagnostic payloads with explicit omission metadata; retain script-job identity while bounding its copied logs/results separately. These are diagnostic limits, not execution limits, and cannot identify every private value in arbitrary user text.
 - The development transition deliberately clears pre-snapshot workflow runs and block runs once, in the same transaction that introduces the snapshot column. This is an explicit exception to normal opt-in retention, authorized while old development logs are disposable. Definitions, budgets, condition baselines, reads, proofs, inbox content, imported archives and helper-owned jobs survive; inbox run links become null. New records follow the normal retention policy. No configuration backfill or parallel legacy log reader is maintained.
+- Execution remains write-first so crashes, failures and active run IDs retain evidence. After successful completion, a scheduled run stopped by an unmatched standalone condition may be compacted only when every executed block belongs to the explicit Schedule/Fetch data/Set variable/If field matches polling set. The first equivalent run remains a representative full heartbeat; later checks within its fixed one-hour window increment its occurrence count/latest activity and delete the redundant parent/block rows atomically. The enabled workflow shape is part of the grouping identity. Manual/event runs, failures, any earlier match and effectful or unknown blocks remain full records.
+- Expiring SQLite Developer diagnostics bypasses no-action compaction for 15 minutes, 1 hour or 24 hours and enables existing safe backend diagnostics. The admin mutation is audited and redaction remains mandatory. This runtime policy is distinct from installer `DEV_MODE`, which continues to control source builds, manifest verification, update-agent participation and build identity.
 
 **Camera extension and media retention**
 
@@ -109,6 +111,9 @@ Integritas history is evidence. A security limit should not decide their product
 - **Full pre/post workflow contexts per block.** Repeated trigger payloads, variables and inherited outputs dominate storage without recording the actual block settings. The next block's pre-context usually duplicates the previous block's post-context.
 - **Reconstruct historic settings from current workflow definitions or backfill old logs.** Edits and deletion make these settings unknowable. The development reset avoids presenting inferred configuration as execution evidence.
 - **A versioned legacy log reader and new detail API.** Deferred: existing routes and compact result envelopes support current consumers; disposable development records do not warrant parallel persistence formats.
+- **Defer persistence until a run becomes meaningful.** Rejected because block and inbox foreign keys, script-job ownership and crash evidence depend on a stable persisted run ID. Post-success compaction preserves the existing write-first safety model.
+- **Compact every successful or skipped run.** Rejected because skipped attached conditions and earlier side effects are not no-ops. Eligibility stays deliberately narrow and unknown blocks fail closed to full retention.
+- **Reuse installer `DEV_MODE` for verbose diagnostics.** Rejected because installation trust/update behavior cannot be safely changed through a runtime database setting.
 - **One 30-day / 10,000-row limit for every table** (first version). Treated diagnostics and user
   data alike and would delete existing data on the first sweep.
 - **Bound runs and block runs as diagnostics** (second version). The global oldest-first cap let one
@@ -141,7 +146,7 @@ Integritas history is evidence. A security limit should not decide their product
 - A leaked webhook token or hostile MQTT publisher can still cause up to 1,000 payments, outputs,
   captures, or stamps per hour per workflow. Webhook and manual-run limiters allow more than that,
   so the budget is the binding limit.
-- Display-only workflows can perform up to 5,000 privileged runs/hour. Approximate one-second scheduling can still record 86,400 reads/runs daily even if change filtering suppresses all output; retention remains opt-in, and this ceiling is not a measured hardware capacity.
+- Display-only workflows can perform up to 5,000 privileged runs/hour. Approximate one-second scheduling can still record 86,400 reads daily even if change filtering suppresses all output; routine no-action run diagnostics are grouped separately, read retention remains opt-in, and this ceiling is not a measured hardware capacity.
 - Failed runs consume budget, which can briefly block after operational failures.
 - Storage still grows without bound while cleanup is off, and protected evidence/files are not bounded by this policy. Disk warnings are informational, not an automatic deletion trigger. Manual category/date cleanup and Dashboard warnings remain follow-ups.
 - Pre-fix Docker logs may still contain webhook tokens until they rotate or are removed.
@@ -150,6 +155,7 @@ Integritas history is evidence. A security limit should not decide their product
 
 ## History
 
+- 2026-11-24: Added write-first smart no-action summaries and expiring runtime Developer diagnostics while retaining full failure, matched and effectful evidence.
 - 2026-11-23: Replaced full block context snapshots with compact redacted execution evidence and recorded configuration; authorized a one-time reset of pre-snapshot development run logs.
 - 2026-11-20: Added the fixed display-only 5,000/hour exception, edit-safe policy rechecks and successful-completion numeric change baselines independent of retained history.
 - 2026-11-03: Replaced capture-time environment pruning with confirmed camera policy, optional-extension pause/resume and proof-media protection (camera portion of #861); generated-download cleanup and Dashboard warnings remain separate.

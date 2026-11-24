@@ -122,7 +122,13 @@ describe("runMigrations — retention and budget schema", () => {
     assert.ok(db.prepare("SELECT run_id FROM automation_workflow_budget_events WHERE run_id = 'old-run'").get());
     db.exec(`INSERT INTO automation_runs (id, workflow_name, started_at, status, trigger_type) VALUES ('new-run', 'Saved flow', '2026-01-02', 'success', 'manual');`);
     runMigrations();
-    assert.ok(db.prepare("SELECT id FROM automation_runs WHERE id = 'new-run'").get());
+    assert.deepEqual(db.prepare("SELECT id, outcome, occurrence_count, last_occurrence_at, coalesce_key FROM automation_runs WHERE id = 'new-run'").get(), {
+      id: "new-run",
+      outcome: "completed",
+      occurrence_count: 1,
+      last_occurrence_at: null,
+      coalesce_key: null,
+    });
     assert.deepEqual(db.pragma("foreign_key_check"), []);
   });
 

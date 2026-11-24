@@ -5,6 +5,7 @@ import { serializeStructuredError, type StructuredError } from "../../shared/str
 import { runSnapshot } from "./automationRunSnapshots.js";
 
 const activeRunIds = new Set<string>();
+export const AUTOMATION_NO_ACTION_WINDOW_MS = 3600000;
 
 export function getActiveAutomationRunIds() {
   return [...activeRunIds];
@@ -22,6 +23,10 @@ export type AutomationRunRecord = {
   trigger_payload_json: string | null;
   duration_ms: number | null;
   block_count: number;
+  outcome: "completed" | "no_action";
+  occurrence_count: number;
+  last_occurrence_at: string | null;
+  coalesce_key: string | null;
   error: string | null;
 };
 
@@ -73,6 +78,39 @@ export function createAutomationBlockRun(input: { runId: string; workflowId: str
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(id, input.runId, input.workflowId, input.blockId, input.orderIndex, input.blockType, input.blockLabel, new Date().toISOString(), "running", input.input === undefined ? null : JSON.stringify(runSnapshot(input.input)), JSON.stringify(runSnapshot(input.config ?? {})));
   return getAutomationBlockRun(id)!;
+}
+
+export function finishAutomationRunActivity(id: string, input: { outcome: "completed" | "no_action"; coalesceKey?: string; compact?: boolean; now?: number }) {
+  activeRunIds.delete(id);
+  const run = getAutomationRun(id);
+  if (!run) return undefined;
+  const now = input.now ?? Date.now();
+  const finishedAt = new Date(now).toISOString();
+  db.prepare(`
+    UPDATE automation_runs
+    SET finished_at = ?, status = 'success', duration_ms = ?, outcome = ?,
+      occurrence_count = 1, last_occurrence_at = ?, coalesce_key = ?
+    WHERE id = ?
+  `).run(finishedAt, duration(run.started_at, finishedAt), input.outcome, finishedAt, input.coalesceKey ?? null, id);
+
+  if (input.outcome !== "no_action" || !input.compact || !input.coalesceKey) return getAutomationRun(id)!;
+  const cutoff = new Date(now - AUTOMATION_NO_ACTION_WINDOW_MS).toISOString();
+  const representative = db.prepare(`
+    SELECT id FROM automation_runs
+    WHERE workflow_id = ? AND id != ? AND status = 'success' AND outcome = 'no_action'
+      AND coalesce_key = ? AND started_at >= ?
+    ORDER BY started_at DESC, id DESC LIMIT 1
+  `).get(run.workflow_id, id, input.coalesceKey, cutoff) as { id: string } | undefined;
+  if (!representative) return getAutomationRun(id)!;
+
+  db.prepare(`
+    UPDATE automation_runs
+    SET occurrence_count = occurrence_count + 1, last_occurrence_at = ?
+    WHERE id = ?
+  `).run(finishedAt, representative.id);
+  db.prepare("DELETE FROM automation_block_runs WHERE run_id = ?").run(id);
+  db.prepare("DELETE FROM automation_runs WHERE id = ?").run(id);
+  return getAutomationRun(representative.id)!;
 }
 
 export function recordAutomationBlockInput(id: string, input: unknown) {
@@ -128,13 +166,13 @@ export function listAutomationRuns(query: AutomationRunListQuery) {
   return db.prepare(`
     SELECT * FROM automation_runs
     ${where}
-    ORDER BY started_at DESC
+    ORDER BY COALESCE(last_occurrence_at, started_at) DESC, started_at DESC, id DESC
     LIMIT ? OFFSET ?
   `).all(...params, query.pageSize, offset) as AutomationRunRecord[];
 }
 
 export function listAutomationRunsForWorkflow(workflowId: string, limit = 20) {
-  return db.prepare("SELECT * FROM automation_runs WHERE workflow_id = ? ORDER BY started_at DESC LIMIT ?").all(workflowId, limit) as AutomationRunRecord[];
+  return db.prepare("SELECT * FROM automation_runs WHERE workflow_id = ? ORDER BY COALESCE(last_occurrence_at, started_at) DESC, started_at DESC, id DESC LIMIT ?").all(workflowId, limit) as AutomationRunRecord[];
 }
 
 export function getAutomationRun(id: string) {

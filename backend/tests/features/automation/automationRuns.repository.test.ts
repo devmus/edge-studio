@@ -3,11 +3,13 @@ import { afterAll, beforeAll, describe, it } from "vitest";
 import { setupTestDatabase } from "../../helpers/testDatabase.js";
 
 let teardown: () => void;
+let db: import("better-sqlite3").Database;
 let repo: typeof import("../../../src/features/automation/automationRuns.repository.js");
 let workflowRepo: typeof import("../../../src/features/automation/automation.repository.js");
 
 beforeAll(async () => {
   const testDb = await setupTestDatabase();
+  db = testDb.db;
   teardown = testDb.teardown;
   repo = await import("../../../src/features/automation/automationRuns.repository.js");
   workflowRepo = await import("../../../src/features/automation/automation.repository.js");
@@ -89,6 +91,47 @@ describe("automationRuns.repository — runs", () => {
     assert.equal(result, undefined);
   });
 
+  it("coalesces equivalent no-action runs and removes redundant block rows", () => {
+    const workflow = makeWorkflow("Polling");
+    const block = workflowRepo.listAutomationBlocks(workflow.id)[0];
+    const first = repo.createAutomationRun({ workflowId: workflow.id, workflowName: "Polling", triggerType: "schedule", blockCount: 1 });
+    repo.createAutomationBlockRun({ runId: first.id, workflowId: workflow.id, blockId: block.id, orderIndex: 1, blockType: "schedule_start", blockLabel: "Start" });
+    const firstResult = repo.finishAutomationRunActivity(first.id, { outcome: "no_action", coalesceKey: "same", compact: true });
+
+    const second = repo.createAutomationRun({ workflowId: workflow.id, workflowName: "Polling", triggerType: "schedule", blockCount: 1 });
+    repo.createAutomationBlockRun({ runId: second.id, workflowId: workflow.id, blockId: block.id, orderIndex: 1, blockType: "schedule_start", blockLabel: "Start" });
+    const secondResult = repo.finishAutomationRunActivity(second.id, { outcome: "no_action", coalesceKey: "same", compact: true });
+
+    assert.equal(firstResult?.id, first.id);
+    assert.equal(secondResult?.id, first.id);
+    assert.equal(secondResult?.occurrence_count, 2);
+    assert.equal(repo.getAutomationRun(second.id), undefined);
+    assert.equal(repo.listAutomationBlockRuns(second.id).length, 0);
+  });
+
+  it("keeps full no-action runs when compaction is disabled", () => {
+    const workflow = makeWorkflow("Diagnostic polling");
+    const first = repo.createAutomationRun({ workflowId: workflow.id, workflowName: "Diagnostic polling", triggerType: "schedule", blockCount: 1 });
+    const second = repo.createAutomationRun({ workflowId: workflow.id, workflowName: "Diagnostic polling", triggerType: "schedule", blockCount: 1 });
+    repo.finishAutomationRunActivity(first.id, { outcome: "no_action", coalesceKey: "same", compact: false });
+    repo.finishAutomationRunActivity(second.id, { outcome: "no_action", coalesceKey: "same", compact: false });
+    assert.equal(repo.listAutomationRunsForWorkflow(workflow.id).length, 2);
+  });
+
+  it("starts a new representative after the fixed one-hour window", () => {
+    const workflow = makeWorkflow("Hourly polling");
+    const base = Date.parse("2026-11-24T10:00:00.000Z");
+    const first = repo.createAutomationRun({ workflowId: workflow.id, workflowName: "Hourly polling", triggerType: "schedule", blockCount: 1 });
+    db.prepare("UPDATE automation_runs SET started_at = ? WHERE id = ?").run(new Date(base).toISOString(), first.id);
+    repo.finishAutomationRunActivity(first.id, { outcome: "no_action", coalesceKey: "same", compact: true, now: base + 1 });
+
+    const second = repo.createAutomationRun({ workflowId: workflow.id, workflowName: "Hourly polling", triggerType: "schedule", blockCount: 1 });
+    db.prepare("UPDATE automation_runs SET started_at = ? WHERE id = ?").run(new Date(base + repo.AUTOMATION_NO_ACTION_WINDOW_MS + 1).toISOString(), second.id);
+    repo.finishAutomationRunActivity(second.id, { outcome: "no_action", coalesceKey: "same", compact: true, now: base + repo.AUTOMATION_NO_ACTION_WINDOW_MS + 2 });
+
+    assert.equal(repo.listAutomationRunsForWorkflow(workflow.id).length, 2);
+  });
+
   it("getAutomationRun returns undefined for a missing id", () => {
     assert.equal(repo.getAutomationRun("missing"), undefined);
   });
@@ -157,6 +200,8 @@ describe("automationRuns.repository — run listing/filtering", () => {
     const workflow = makeWorkflow("OrderWf");
     const first = repo.createAutomationRun({ workflowId: workflow.id, workflowName: "OrderWf", triggerType: "manual", blockCount: 1 });
     const second = repo.createAutomationRun({ workflowId: workflow.id, workflowName: "OrderWf", triggerType: "manual", blockCount: 1 });
+    db.prepare("UPDATE automation_runs SET started_at = ? WHERE id = ?").run("2026-01-01T00:00:00.000Z", first.id);
+    db.prepare("UPDATE automation_runs SET started_at = ? WHERE id = ?").run("2026-01-01T00:00:01.000Z", second.id);
 
     const results = repo.listAutomationRuns(baseQuery({ q: "OrderWf" }));
     const firstIndex = results.findIndex((r) => r.id === first.id);

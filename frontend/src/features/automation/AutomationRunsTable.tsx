@@ -31,7 +31,7 @@ import { formatRunDuration, RUN_STATUS } from "./automationRunDisplay";
 import type { AutomationRun } from "./automationTypes";
 
 export const WORKFLOW_RUN_COLUMNS = [
-  { id: "started", label: "Started" },
+  { id: "started", label: "Activity" },
   { id: "workflow", label: "Workflow", filterable: true },
   { id: "trigger", label: "Trigger", filterable: true },
   { id: "status", label: "Status" },
@@ -199,10 +199,11 @@ function WorkflowRunCell({
   onView: () => void;
 }) {
   if (columnId === "started") {
+    const activityAt = run.lastOccurrenceAt ?? run.startedAt;
     return (
       <TableCell className="whitespace-nowrap">
-        <time className="text-text-secondary type-meta" dateTime={run.startedAt}>
-          {formatLocalDateTime(run.startedAt)}
+        <time className="text-text-secondary type-meta" dateTime={activityAt}>
+          {formatLocalDateTime(activityAt)}
         </time>
       </TableCell>
     );
@@ -217,11 +218,12 @@ function WorkflowRunCell({
   if (columnId === "trigger") {
     return (
       <TableCell>
-        <Pill>{run.triggerType}</Pill>
+        <Pill>{run.outcome === "no_action" ? `${run.occurrenceCount ?? 1} scheduled checks` : run.triggerType}</Pill>
       </TableCell>
     );
   }
   if (columnId === "status") {
+    if (run.outcome === "no_action") return <TableCell><Pill tone="neutral" indicator>No action</Pill></TableCell>;
     return (
       <TableCell>
         <Pill tone={status.tone} indicator>

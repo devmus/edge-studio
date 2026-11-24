@@ -6,8 +6,12 @@ const envMock = vi.hoisted(() => ({
   hostAgentToken: "token-1",
   hostCapabilityDebug: false
 }));
+const diagnosticsMock = vi.hoisted(() => vi.fn(() => false));
 
 vi.mock("../../../src/config/env.js", () => ({ env: envMock }));
+vi.mock("../../../src/features/settings/developerDiagnostics.service.js", () => ({
+  isDeveloperDiagnosticsEnabled: diagnosticsMock
+}));
 
 const service = await import("../../../src/features/host-capabilities/hostCapabilities.service.js");
 
@@ -25,6 +29,7 @@ beforeEach(() => {
   envMock.hostAgentUrl = "http://host-agent/";
   envMock.hostAgentToken = "token-1";
   envMock.hostCapabilityDebug = false;
+  diagnosticsMock.mockReset().mockReturnValue(false);
   fetchMock.mockReset();
   vi.stubGlobal("fetch", fetchMock);
 });
@@ -138,5 +143,18 @@ describe("hostCapabilities.service", () => {
 
     assert.ok(log.mock.calls.some((call) => String(call[0]).includes("[host-capabilities] list /capabilities")));
     assert.ok(log.mock.calls.some((call) => String(call[0]).includes("[host-capabilities] response /capabilities")));
+  });
+
+  it("logs secret-safe diagnostics when runtime diagnostics are enabled", async () => {
+    diagnosticsMock.mockReturnValue(true);
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    fetchMock.mockResolvedValue(response(200, { items: [], accessToken: "secret-value", reason: "Authorization: Bearer secret-value" }));
+
+    await service.listHostCapabilities();
+
+    assert.ok(log.mock.calls.some((call) => String(call[0]).includes("[host-capabilities] list /capabilities")));
+    assert.ok(log.mock.calls.some((call) => String(call[0]).includes("[host-capabilities] response /capabilities")));
+    assert.doesNotMatch(JSON.stringify(log.mock.calls), /secret-value/);
+    assert.match(JSON.stringify(log.mock.calls), /\[redacted\]/);
   });
 });

@@ -254,7 +254,7 @@ export function WatchReplayControls({
 }
 
 const WATCH_RUN_COLUMNS = [
-  { id: "started", label: "Started" },
+  { id: "started", label: "Activity" },
   { id: "trigger", label: "Trigger" },
   { id: "status", label: "Status" },
   { id: "duration", label: "Duration" },
@@ -264,7 +264,7 @@ const WATCH_RUN_COLUMNS = [
 
 const WATCH_RUN_SUMMARY_FIELDS = [
   { id: "status", label: "Status" },
-  { id: "started", label: "Started" },
+  { id: "started", label: "Activity" },
   { id: "trigger", label: "Trigger" },
   { id: "duration", label: "Duration" },
   { id: "blocks", label: "Blocks" },
@@ -468,9 +468,10 @@ function WatchRunCell({
   onOpenError: () => void;
   onOpenJobs: () => void;
 }) {
-  if (columnId === "started") return <TableCell>{formatLocalTime(run.startedAt)}</TableCell>;
-  if (columnId === "trigger") return <TableCell>{run.triggerType}</TableCell>;
+  if (columnId === "started") return <TableCell>{formatLocalTime(run.lastOccurrenceAt ?? run.startedAt)}</TableCell>;
+  if (columnId === "trigger") return <TableCell>{run.outcome === "no_action" ? `${run.occurrenceCount ?? 1} scheduled checks` : run.triggerType}</TableCell>;
   if (columnId === "status") {
+    if (run.outcome === "no_action") return <TableCell><StatusPill status="neutral">no action</StatusPill></TableCell>;
     return (
       <TableCell>
         <StatusPill status={statusTone(run.status)}>
@@ -521,11 +522,13 @@ function WatchRunSummaryCard({ fieldId, run }: { fieldId: string; run: Automatio
   let valueClassName = "type-body-em text-text-primary";
 
   if (fieldId === "status") {
-    value = <StatusPill status={statusTone(run.status)}>{run.status}</StatusPill>;
+    value = run.outcome === "no_action"
+      ? <StatusPill status="neutral">no action</StatusPill>
+      : <StatusPill status={statusTone(run.status)}>{run.status}</StatusPill>;
     valueClassName = "";
-  } else if (fieldId === "started") value = formatLocalTime(run.startedAt);
+  } else if (fieldId === "started") value = formatLocalTime(run.lastOccurrenceAt ?? run.startedAt);
   else if (fieldId === "finished") value = run.finishedAt ? formatLocalTime(run.finishedAt) : "Still running";
-  else if (fieldId === "trigger") value = run.triggerType;
+  else if (fieldId === "trigger") value = run.outcome === "no_action" ? `${run.occurrenceCount ?? 1} scheduled checks` : run.triggerType;
   else if (fieldId === "duration") value = formatDuration(run.durationMs);
   else if (fieldId === "blocks") value = `${successfulBlockCount(run)}/${run.blockCount}`;
   else if (fieldId === "runId") {
@@ -1272,7 +1275,7 @@ export function WatchRunHistory({
           </p>
         </div>
         <div className="gap-detail-next flex shrink-0 items-center justify-end">
-          <StatusPill status="neutral">{runs.length} run(s)</StatusPill>
+          <StatusPill status="neutral">{runs.length} {runs.length === 1 ? "activity" : "activities"}</StatusPill>
           {expanded ? (
             <TableColumnVisibilityButton
               tableLabel="Historic runs"

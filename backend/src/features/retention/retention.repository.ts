@@ -4,15 +4,15 @@ import type { RetentionSettings } from "./retention-settings.service.js";
 
 const configuredRuns = `
   WITH ranked AS (
-    SELECT id, workflow_id, started_at,
-      ROW_NUMBER() OVER (PARTITION BY workflow_id ORDER BY started_at DESC, id DESC) AS position
+    SELECT id, workflow_id, started_at, last_occurrence_at,
+      ROW_NUMBER() OVER (PARTITION BY workflow_id ORDER BY COALESCE(last_occurrence_at, started_at) DESC, started_at DESC, id DESC) AS position
     FROM automation_runs
   )
   SELECT id FROM ranked
   WHERE id NOT IN (SELECT value FROM json_each(@activeRuns))
     AND ((workflow_id IS NOT NULL AND position > @runsPerWorkflow)
       OR (workflow_id IS NULL AND started_at < @deletedCutoff))
-  ORDER BY started_at ASC, id ASC
+  ORDER BY COALESCE(last_occurrence_at, started_at) ASC, started_at ASC, id ASC
 `;
 
 const configuredReads = `SELECT id FROM data_source_reads

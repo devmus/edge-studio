@@ -60,7 +60,8 @@ export function buildHistoryArchive() {
   `).all() as Record<string, unknown>[]).map((row) => redactDeep(row));
   const workflowRuns = (db.prepare(`
     SELECT id, workflow_id, workflow_name, started_at, finished_at, status, trigger_type,
-      trigger_source_id, trigger_payload_json, duration_ms, block_count, error
+      trigger_source_id, trigger_payload_json, duration_ms, block_count, outcome,
+      occurrence_count, last_occurrence_at, error
     FROM automation_runs ORDER BY started_at ASC, id ASC
   `).all() as RunRow[]).map((row) => ({
     ...row,

@@ -21,8 +21,8 @@ describe("buildHistoryArchive", () => {
       .run("tx-1", "0x00", "in", "1", "Minima", "Mxrecipient", 1, "wallet-fingerprint", "2026-10-15T00:00:00.000Z");
     db.prepare("INSERT INTO automation_workflows (id, created_at, updated_at, name, enabled) VALUES (?, ?, ?, ?, ?)")
       .run("workflow-1", "2026-10-15T00:00:00.000Z", "2026-10-15T00:00:00.000Z", "Workflow", 1);
-    db.prepare("INSERT INTO automation_runs (id, workflow_id, workflow_name, started_at, status, trigger_type, trigger_payload_json) VALUES (?, ?, ?, ?, ?, ?, ?)")
-      .run("run-1", "workflow-1", "Workflow", "2026-10-15T00:00:00.000Z", "success", "webhook", JSON.stringify({ reading: 12, apiKey: "secret-key" }));
+    db.prepare("INSERT INTO automation_runs (id, workflow_id, workflow_name, started_at, status, trigger_type, trigger_payload_json, outcome, occurrence_count, last_occurrence_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .run("run-1", "workflow-1", "Workflow", "2026-10-15T00:00:00.000Z", "success", "webhook", JSON.stringify({ reading: 12, apiKey: "secret-key" }), "no_action", 12, "2026-10-15T01:00:00.000Z");
     db.prepare("INSERT INTO automation_block_runs (id, run_id, order_index, block_type, block_label, started_at, status, output_json, config_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
       .run("block-1", "run-1", 0, "fetch", "Fetch", "2026-10-15T00:00:00.000Z", "success", JSON.stringify({ temperature: 21, password: "secret-password" }), JSON.stringify({ sourceId: "source-1" }));
     db.prepare("INSERT INTO automation_inbox_items (id, workflow_name, run_id, title, format, content_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
@@ -38,6 +38,9 @@ describe("buildHistoryArchive", () => {
     assert.equal(archive.format, "edge-studio-history");
     assert.equal(archive.schemaVersion, 1);
     assert.equal(archive.records.workflowRuns[0]?.id, "run-1");
+    assert.equal(archive.records.workflowRuns[0]?.outcome, "no_action");
+    assert.equal(archive.records.workflowRuns[0]?.occurrence_count, 12);
+    assert.equal(archive.records.workflowRuns[0]?.last_occurrence_at, "2026-10-15T01:00:00.000Z");
     assert.equal(archive.records.workflowBlockRuns[0]?.run_id, "run-1");
     assert.equal(archive.records.workflowInboxItems[0]?.run_id, "run-1");
     assert.equal(archive.records.dataSourceReads[0]?.integritas_proof_id, "proof-1");

@@ -118,6 +118,7 @@ afterAll(() => {
 });
 
 beforeEach(() => {
+  db.prepare("DELETE FROM settings WHERE key = 'developer_diagnostics_settings'").run();
   readJsonApiSourceMock.mockReset();
   readDeviceSystemDataSourceMock.mockReset();
   sendHttpOutputMock.mockReset();
@@ -197,6 +198,44 @@ describe("persisted change-threshold workflows", () => {
       baseline: () => workflowRepo.getConditionBaseline(workflow.id, condition.id, key),
     };
   }
+
+  it("groups repeated scheduled no-action checks unless developer diagnostics are enabled", async () => {
+    const workflow = makeWorkflow([
+      { type: "schedule_start", config: { intervalSeconds: 60 } },
+      { type: "set_variable", config: { variableName: "lux", variableSource: "custom_json", valueJsonText: "10" } },
+      { type: "if_payload_field_equals", config: { source: "variable", variableName: "lux", operator: "changed_by_at_least", value: 1 } },
+    ]);
+    await service.runAutomationWorkflow(workflow.id, { type: "schedule" });
+    await service.runAutomationWorkflow(workflow.id, { type: "schedule" });
+    await service.runAutomationWorkflow(workflow.id, { type: "schedule" });
+    let runs = runsRepo.listAutomationRunsForWorkflow(workflow.id);
+    assert.equal(runs.length, 2);
+    assert.ok(runs[0].coalesce_key);
+    assert.equal(runs[0].outcome, "no_action");
+    assert.equal(runs[0].occurrence_count, 2);
+
+    const diagnostics = await import("../../../src/features/settings/developerDiagnostics.service.js");
+    diagnostics.saveDeveloperDiagnosticsSettings({ enabled: true, durationMinutes: 15 });
+    const diagnosticRun = service.runAutomationWorkflow(workflow.id, { type: "schedule" });
+    diagnostics.saveDeveloperDiagnosticsSettings({ enabled: false });
+    await diagnosticRun;
+    runs = runsRepo.listAutomationRunsForWorkflow(workflow.id);
+    assert.equal(runs.length, 3);
+    assert.equal(runs[0].outcome, "no_action");
+    assert.equal(runs[0].occurrence_count, 1);
+
+    await service.runAutomationWorkflow(workflow.id, { type: "schedule" });
+    runs = runsRepo.listAutomationRunsForWorkflow(workflow.id);
+    assert.equal(runs.length, 3);
+    assert.deepEqual(runs.filter((run) => run.outcome === "no_action").map((run) => run.occurrence_count).sort((a, b) => a - b), [1, 3]);
+
+    const schedule = workflowRepo.listAutomationBlocks(workflow.id)[0];
+    workflowRepo.updateAutomationBlock(workflow.id, schedule.id, { config: { intervalSeconds: 120 } });
+    await service.runAutomationWorkflow(workflow.id, { type: "schedule" });
+    runs = runsRepo.listAutomationRunsForWorkflow(workflow.id);
+    assert.equal(runs.length, 4);
+    assert.deepEqual(runs.filter((run) => run.outcome === "no_action").map((run) => run.occurrence_count).sort((a, b) => a - b), [1, 1, 3]);
+  });
 
   it("first displays immediately, accumulates small changes and handles decreases without charging skipped output", async () => {
     const { workflow, setReading, baseline } = changeWorkflow();

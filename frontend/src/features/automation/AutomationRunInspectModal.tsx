@@ -36,6 +36,13 @@ export function AutomationRunInspectModal({
       <div className="gap-detail-near grid">
         <DetailList>
           <DetailRow label="Started" value={formatLocalDateTime(run.startedAt)} />
+          {run.outcome === "no_action" ? (
+            <>
+              <DetailRow label="Activity" value="No action required" />
+              <DetailRow label="Scheduled checks" value={String(run.occurrenceCount ?? 1)} />
+              <DetailRow label="Latest check" value={formatLocalDateTime(run.lastOccurrenceAt ?? run.startedAt)} />
+            </>
+          ) : null}
           <DetailRow label="Trigger" value={<Pill>{run.triggerType}</Pill>} />
           <DetailRow
             label="Status"
@@ -49,6 +56,12 @@ export function AutomationRunInspectModal({
           <DetailRow label="Blocks" value={`${successBlocks}/${run.blockCount}`} />
           {failedBlock ? <DetailRow label="Failed block" value={failedBlock.blockLabel} /> : null}
         </DetailList>
+
+        {run.outcome === "no_action" && (run.occurrenceCount ?? 1) > 1 ? (
+          <p className="type-body text-text-secondary m-0">
+            Block details represent the first check in this group. Later equivalent scheduled checks were compacted because their condition stopped before any action.
+          </p>
+        ) : null}
 
         {error ? (
           <Disclosure title="Error">

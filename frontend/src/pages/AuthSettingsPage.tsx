@@ -8,6 +8,7 @@ import {
   PanelLeft,
   RefreshCw,
   Terminal,
+  Bug,
 } from "lucide-react";
 import { Button } from "../components/Button";
 import { ButtonRow } from "../components/ButtonRow";
@@ -29,6 +30,7 @@ import { useAuth } from "../features/auth/hooks";
 import { StorageHistoryPanel } from "../features/storage-history/StorageHistoryPanel";
 import { RetentionSettingsPanel } from "../features/storage-history/RetentionSettingsPanel";
 import { CameraRetentionSettingsPanel } from "../features/storage-history/CameraRetentionSettingsPanel";
+import { DeveloperDiagnosticsPanel } from "../features/settings/DeveloperDiagnosticsPanel";
 
 /** Long enough to read the confirmation before the forced re-login. */
 const SIGN_OUT_AFTER_CREDENTIAL_CHANGE_MS = 3000;
@@ -36,6 +38,7 @@ const SIGN_OUT_AFTER_CREDENTIAL_CHANGE_MS = 3000;
 export function AuthSettingsPage() {
   const [storageHistoryOpen, setStorageHistoryOpen] = useState(false);
   const [securityOpen, setSecurityOpen] = useState(false);
+  const [developerOpen, setDeveloperOpen] = useState(false);
   const [uninstallMode, setUninstallMode] = useState<"keep" | "delete">("keep");
   const { signOut } = useAuth();
   const navigate = useNavigate();
@@ -86,6 +89,22 @@ export function AuthSettingsPage() {
             </SubSection>
             {storageHistoryOpen ? <RetentionSettingsPanel /> : null}
             {storageHistoryOpen ? <CameraRetentionSettingsPanel /> : null}
+          </div>
+        </Disclosure>
+
+        <Disclosure
+          title={
+            <span className="flex items-center gap-2">
+              <Bug size={16} aria-hidden />
+              <h2 className="type-title text-text-primary m-0">Developer</h2>
+            </span>
+          }
+          className="pt-4 pb-6"
+          defaultOpen={false}
+          onToggle={(event) => setDeveloperOpen(event.currentTarget.open)}
+        >
+          <div className="gap-detail-close mt-2 grid">
+            {developerOpen ? <DeveloperDiagnosticsPanel /> : null}
           </div>
         </Disclosure>
 

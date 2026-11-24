@@ -123,6 +123,9 @@ export type AutomationRun = {
   triggerPayload: unknown;
   durationMs: number | null;
   blockCount: number;
+  outcome?: "completed" | "no_action";
+  occurrenceCount?: number;
+  lastOccurrenceAt?: string;
   error: string | null;
   errorDetails?: unknown;
   blocks: AutomationBlockRun[];

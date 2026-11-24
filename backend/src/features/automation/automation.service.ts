@@ -39,7 +39,7 @@ import {
 import type { IntegritasApiFailure } from "../integritas/integritas.types.js";
 import { getIntegritasApiKey } from "../settings/secrets.service.js";
 import { getWalletStatus, recordWalletSendHistory, sendPayment } from "../wallet/wallet.service.js";
-import { sha3HashHex } from "../../shared/crypto.js";
+import { sha256Hex, sha3HashHex } from "../../shared/crypto.js";
 import {
   blockError,
   errorFromUnknown,
@@ -57,6 +57,7 @@ import {
   updateAutomationWorkflow,
   updateAutomationRunError,
   updateAutomationRunSuccess,
+  type AutomationBlockType,
   type AutomationBlockRecord,
   type AutomationWorkflowRecord,
 } from "./automation.repository.js";
@@ -65,6 +66,7 @@ import {
   createAutomationRun,
   finishAutomationBlockRun,
   finishAutomationRun,
+  finishAutomationRunActivity,
   listAutomationBlockRuns,
   listAutomationRuns,
   listAutomationRunsForWorkflow,
@@ -84,6 +86,7 @@ import {
   workflowRunBudgetLimit,
 } from "./automation.policy.js";
 import { validateAutomationWorkflow } from "./automation.validation.js";
+import { isDeveloperDiagnosticsEnabled } from "../settings/developerDiagnostics.service.js";
 
 type WorkflowTriggerType = "manual" | "schedule" | "webhook" | "mqtt" | "gpio";
 
@@ -116,6 +119,8 @@ type WorkflowContext = {
   budgetLimit: number;
   pendingBaselines: PendingConditionBaseline[];
   variables: Record<string, unknown>;
+  conditionMatched: boolean;
+  executedBlockTypes: AutomationBlockType[];
 };
 
 type FieldCondition = {
@@ -213,6 +218,9 @@ export function serializeAutomationRun(record: AutomationRunRecord) {
       : null,
     durationMs: record.duration_ms,
     blockCount: record.block_count,
+    outcome: record.outcome,
+    occurrenceCount: record.occurrence_count,
+    lastOccurrenceAt: record.last_occurrence_at ?? record.finished_at ?? record.started_at,
     error: errorMessage(record.error),
     errorDetails,
     blocks: listAutomationBlockRuns(record.id).map(serializeAutomationBlockRun),
@@ -280,7 +288,8 @@ export async function executeWorkflow(
   markEventWorkflowAccepted(latestWorkflow.id, mainBlocks[0], trigger);
 
   runningWorkflowIds.add(latestWorkflow.id);
-  const context: WorkflowContext = { trigger, variables: {}, pendingBaselines: [], budgetLimit: workflowRunBudgetLimit(blocks, (id) => getDataSource(id)?.type) };
+  const retainFullDiagnostics = isDeveloperDiagnosticsEnabled();
+  const context: WorkflowContext = { trigger, variables: {}, pendingBaselines: [], budgetLimit: workflowRunBudgetLimit(blocks, (id) => getDataSource(id)?.type), conditionMatched: false, executedBlockTypes: [] };
   let nextRunAt: string | null = latestWorkflow.next_run_at;
   let run = null as ReturnType<typeof createAutomationRun> | null;
 
@@ -311,7 +320,13 @@ export async function executeWorkflow(
         proofId: context.proofId ?? null,
         nextRunAt,
       });
-      finishAutomationRun(run!.id, { status: "success" });
+      const noAction = isScheduledNoAction(context);
+      const compact = noAction && !retainFullDiagnostics;
+      finishAutomationRunActivity(run!.id, {
+        outcome: noAction ? "no_action" : "completed",
+        coalesceKey: compact ? workflowActivityKey(blocks) : undefined,
+        compact,
+      });
       return updated;
     })();
     return {
@@ -498,6 +513,7 @@ async function executeBlock(
     contentTemplateText?: string;
     imageSource?: PreviewImageSource;
   };
+  context.executedBlockTypes.push(block.type);
   const blockRun = createAutomationBlockRun({
     runId,
     workflowId: workflow.id,
@@ -999,9 +1015,34 @@ function checkPayloadFieldEquals(workflow: AutomationWorkflowRecord, block: Auto
   const key = conditionBaselineKey(config);
   const previous = config.operator === "changed_by_at_least" ? getConditionBaseline(workflow.id, block.id, key) : null;
   const result = evaluateWorkflowCondition(context, config, previous);
+  if (result.matched) context.conditionMatched = true;
   if (config.operator === "changed_by_at_least" && result.matched) context.pendingBaselines.push({ blockId: block.id, configJson: block.config_json, key, value: result.actual as number });
   context.output = { ...result, action: result.matched ? "continued" : "stopped" };
   if (!result.matched) context.stopped = true;
+}
+
+const NO_ACTION_BLOCK_TYPES = new Set<AutomationBlockType>([
+  "schedule_start",
+  "fetch_data_source",
+  "set_variable",
+  "if_payload_field_equals",
+]);
+
+function isScheduledNoAction(context: WorkflowContext) {
+  return context.trigger.type === "schedule"
+    && context.stopped === true
+    && !context.conditionMatched
+    && context.executedBlockTypes.every((type) => NO_ACTION_BLOCK_TYPES.has(type));
+}
+
+function workflowActivityKey(blocks: AutomationBlockRecord[]) {
+  return sha256Hex(JSON.stringify(blocks.map((block) => ({
+    id: block.id,
+    type: block.type,
+    order: block.order_index,
+    parentBlockId: block.parent_block_id,
+    config: block.config_json,
+  }))));
 }
 
 function evaluateWorkflowCondition(context: WorkflowContext, condition: WorkflowCondition, previous: number | null) {

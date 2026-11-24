@@ -27,6 +27,7 @@ import { addressBookRouter } from "./features/address-book/address-book.routes.j
 import { walletRouter } from "./features/wallet/wallet.routes.js";
 import { requestLogger } from "./middleware/requestLogger.js";
 import { uploadErrorHandler } from "./middleware/uploadErrors.js";
+import { settingsRouter } from "./features/settings/settings.routes.js";
 
 export function createApp() {
   const app = express();
@@ -60,6 +61,7 @@ export function createApp() {
   app.use("/api/wallet", walletRouter);
   app.use("/api/wallet/address-book", addressBookRouter);
   app.use("/api/preferences", preferencesRouter);
+  app.use("/api/settings", settingsRouter);
 
   app.use(uploadErrorHandler);
 

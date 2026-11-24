@@ -945,7 +945,7 @@ describe("WatchRunHistory", () => {
     render(<WatchRunHistory runs={[]} selectedRunId={null} onSelectRun={vi.fn()} />);
     expect(screen.getByText("No workflow runs recorded yet.")).toBeInTheDocument();
     expect(screen.getByText("Run the workflow to inspect its results here.")).toBeInTheDocument();
-    expect(screen.getByText("0 run(s)")).toBeInTheDocument();
+    expect(screen.getByText("0 activities")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Expand history" })).toBeDisabled();
   });
 
@@ -958,7 +958,7 @@ describe("WatchRunHistory", () => {
     expect(screen.getByRole("button", { name: /Newer run/ })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Choose fields for Selected run summary" })).toBeInTheDocument();
     expect(screen.getByText("Status")).toBeInTheDocument();
-    expect(screen.getByText("Started")).toBeInTheDocument();
+    expect(screen.getByText("Activity")).toBeInTheDocument();
     expect(screen.getByText("Trigger")).toBeInTheDocument();
     expect(screen.getByText("Duration")).toBeInTheDocument();
     expect(screen.getByText("Blocks")).toBeInTheDocument();
@@ -991,6 +991,18 @@ describe("WatchRunHistory", () => {
     expect(within(table).getByText("success")).toBeInTheDocument();
     expect(within(table).getByText("1/1")).toBeInTheDocument();
     expectRowActionsPinned(screen.getByRole("table"), "Details");
+  });
+
+  it("shows grouped no-action schedule checks as one history activity", async () => {
+    render(<WatchRunHistory runs={[run({ triggerType: "schedule", outcome: "no_action", occurrenceCount: 30, lastOccurrenceAt: "2026-08-01T00:10:00.000Z" })]} selectedRunId="r1" onSelectRun={vi.fn()} />);
+    const selectedRun = screen.getByTestId("collapsed-run-history");
+    expect(within(selectedRun).getByText("30 scheduled checks")).toBeInTheDocument();
+    expect(within(selectedRun).getByText("no action")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /Expand history/ }));
+    const table = screen.getByRole("table");
+    expect(within(table).getByText("30 scheduled checks")).toBeInTheDocument();
+    expect(within(table).getByText("no action")).toBeInTheDocument();
   });
 
   it("calls onSelectRun when 'Show on canvas' is clicked", async () => {

@@ -19,6 +19,7 @@ Ticket #628 asks which environment values belong in app settings. Docker and hos
 | Retention policy | SQLite app settings with opt-in cleanup and reviewed previews in Storage & history (#857/#819; ADR 0022) |
 | Camera retention | SQLite policy with reviewed file previews, optional-extension status, paused migration and protected proof media (ADR 0022; proof-media part of #861) |
 | Session lifetimes | SQLite policy in Settings → Security, with current-credential confirmation and bounded session enforcement |
+| Expiring Developer diagnostics | Audited SQLite runtime policy; full workflow capture and safe backend diagnostics only, never source-build/update trust behavior |
 | Service URLs, executable names, debug flags and technical timeout/resource defaults | Built-in defaults with optional deployment overrides; no automatic requirement for UI controls |
 
 Minima monitoring settings use one atomic settings document. Its first read, normally during backend startup, seeds valid legacy environment values once. Later environment edits do not override SQLite. Invalid or out-of-range legacy numeric values use the existing defaults with a warning; malformed stored settings fail validation rather than silently being replaced.
@@ -55,5 +56,6 @@ Legacy environment inputs remain wired through Compose for migration compatibili
 
 ## History
 
+- 2026-11-24: Kept installer `DEV_MODE` as deployment configuration and added separate expiring SQLite Developer diagnostics.
 - 2026-11-03: Added credential-confirmed session policy, inclusive expiry and transactional existing-session enforcement without extending absolute expiries or restoring expired sessions.
 - 2026-11-03: Moved camera retention to a separate SQLite document; retained optional camera enablement and helper configuration as deployment settings.
