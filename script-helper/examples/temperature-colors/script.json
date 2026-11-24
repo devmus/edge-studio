@@ -1,0 +1,6 @@
+{
+  "id": "temperature-colors",
+  "name": "Temperature color screen",
+  "entrypoint": "main.py",
+  "capabilities": ["display.frames"]
+}

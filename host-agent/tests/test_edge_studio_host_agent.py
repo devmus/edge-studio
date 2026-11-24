@@ -565,6 +565,10 @@ class HostAgentWriteTests(unittest.TestCase):
         for path in self.agent.HOST_RUNTIME_FILES:
             self.assertEqual((self.root / path).read_text(encoding="utf-8"), f"updated {path}\n")
 
+    def test_host_runtime_update_includes_bundled_temperature_example(self):
+        for name in ("script.json", "main.py", "requirements.txt"):
+            self.assertIn(f"script-helper/examples/temperature-colors/{name}", self.agent.HOST_RUNTIME_FILES)
+
     def test_apply_host_runtime_update_rejects_missing_required_file(self):
         files = {path: f"updated {path}\n" for path in self.agent.HOST_RUNTIME_FILES}
         del files["host-agent/edge_studio_host_agent.py"]

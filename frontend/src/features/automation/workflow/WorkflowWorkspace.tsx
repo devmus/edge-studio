@@ -62,7 +62,6 @@ import {
   BlockHelpDisclosure,
   SelectedBlockSheet,
   WorkflowValidationPanel,
-  errorText,
   isWorkflowValidationVisible,
   mutedText,
 } from "./workflowWorkspaceUi";
@@ -595,11 +594,6 @@ export function WorkflowWorkspace({
                 Archived workflows do not run automatically or manually until restored.
               </p>
             )}
-            {mode === "edit" && workflow.lastError ? (
-              <p className={errorText} role="alert">
-                Last run failed: {workflow.lastError}
-              </p>
-            ) : null}
             {mode === "watch" && selectedRun?.error ? <Button type="button" variant="secondary" size="sm" onClick={() => setErrorRun(selectedRun)}>View selected run error</Button> : null}
           </>
         ) : undefined

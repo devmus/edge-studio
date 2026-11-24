@@ -1,5 +1,5 @@
 import fs from "node:fs/promises";
-import { stopCustomCodeOwner } from "../custom-code/customCode.service.js";
+import { customCodeConfigError, stopCustomCodeOwner } from "../custom-code/customCode.service.js";
 import path from "node:path";
 import { Router } from "express";
 import { env } from "../../config/env.js";
@@ -214,8 +214,10 @@ automationRouter.patch("/workflows/:workflowId/blocks/:blockId", requireRole("ad
   if (!workflow) return notFound(res, "Automation workflow not found");
   const currentBlock = listAutomationBlocks(workflow.id).find((block) => block.id === req.params.blockId);
   if (!currentBlock) return notFound(res, "Block not found");
-  if (currentBlock.type === "run_custom_code" && !await stopOwnedCode(res, workflow.id, currentBlock.id)) return;
-  const config = req.body?.config && typeof req.body.config === "object" && !Array.isArray(req.body.config) ? req.body.config as Record<string, unknown> : undefined;
+  if (req.body?.config !== undefined && (!req.body.config || typeof req.body.config !== "object" || Array.isArray(req.body.config))) {
+    return badRequest(res, "Invalid block config");
+  }
+  const config = req.body?.config as Record<string, unknown> | undefined;
   if (config) {
     try {
       validateBlockConfig(currentBlock.type, config);
@@ -223,9 +225,15 @@ automationRouter.patch("/workflows/:workflowId/blocks/:blockId", requireRole("ad
       return badRequest(res, error instanceof Error ? error.message : "Invalid block config");
     }
   }
+  const enabled = typeof req.body?.enabled === "boolean" ? req.body.enabled : undefined;
+  const changesBlock = config !== undefined || (enabled !== undefined && enabled !== Boolean(currentBlock.enabled));
+  if (!changesBlock) {
+    return res.json({ item: serializeAutomationBlock(currentBlock), workflow: serializeAutomationWorkflow(workflow) });
+  }
+  if (currentBlock.type === "run_custom_code" && !await stopOwnedCode(res, workflow.id, currentBlock.id)) return;
   const block = updateAutomationBlock(req.params.workflowId, req.params.blockId, {
     config,
-    enabled: typeof req.body?.enabled === "boolean" ? req.body.enabled : undefined
+    enabled
   });
   if (!block) return notFound(res, "Block not found");
   syncMqttDataSources();
@@ -395,6 +403,12 @@ function validateBlockConfig(type: AutomationBlockType, config: Record<string, u
     if (typeof config.targetId !== "string") config.targetId = "";
     const durationMs = Number(config.durationMs);
     if (Number.isFinite(durationMs)) config.durationMs = durationMs;
+    return;
+  }
+
+  if (type === "run_custom_code") {
+    const error = customCodeConfigError(config);
+    if (error) throw new Error(error);
     return;
   }
 

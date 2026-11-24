@@ -40,7 +40,7 @@ import {
   sourceLabel,
   sourcesForStart,
 } from "./workflowHelpers";
-import { InspectorSection, errorText, formGridClass, mutedText } from "./workflowWorkspaceUi";
+import { InspectorSection, formGridClass, mutedText } from "./workflowWorkspaceUi";
 import { draftBlockDescription, isDataBlock, type DraftWorkflowBlock } from "./canvas";
 
 const CREATE_RECIPIENT_VALUE = "__create_new_recipient__";
@@ -931,7 +931,6 @@ export const PersistedBlockInspector = forwardRef<
         onAttachedRemove={onDeleteAttached}
         onCreateAddressBookEntry={onCreateAddressBookEntry}
       />
-      {block.lastError && <p className={errorText}>{block.lastError}</p>}
       {canAttachStamp ? (
         <InspectorSection
           title="Stamp data"

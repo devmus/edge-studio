@@ -1022,8 +1022,11 @@ export function WatchRuntimeInspector({
   const [readDetailsLoading, setReadDetailsLoading] = useState(false);
   const [readDetailsError, setReadDetailsError] = useState<string | null>(null);
   const [inspectedError, setInspectedError] = useState<{ error: unknown; run?: AutomationRun } | null>(null);
-  const error = latestBlockRun?.errorDetails ?? latestBlockRun?.error ?? selectedRun?.errorDetails ?? selectedRun?.error
-    ?? (!selectedRun && !latestBlockRun ? selectedBlock?.lastErrorDetails ?? selectedBlock?.lastError : null);
+  const error = latestBlockRun?.status === "failed"
+    ? latestBlockRun.errorDetails ?? latestBlockRun.error ?? selectedRun?.errorDetails ?? selectedRun?.error
+    : !selectedRun && !latestBlockRun
+      ? selectedBlock?.lastErrorDetails ?? selectedBlock?.lastError
+      : null;
   const blockWasSkipped = latestBlockRun?.status === "skipped";
   const blockNotReached = Boolean(selectedBlock && selectedRun && !latestBlockRun);
   const blockStoppedBeforeRun = blockNotReached && selectedRun?.status === "failed";

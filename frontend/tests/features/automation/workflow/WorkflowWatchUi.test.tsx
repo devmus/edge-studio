@@ -473,7 +473,7 @@ describe("WatchRuntimeInspector", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows selected run summary and error", () => {
+  it("shows the selected run summary without duplicating its error", () => {
     render(
       <WatchRuntimeInspector
         selectedBlock={undefined}
@@ -482,7 +482,7 @@ describe("WatchRuntimeInspector", () => {
       />,
     );
     expect(screen.getByText("failed")).toBeInTheDocument();
-    expect(screen.getByText("boom")).toBeInTheDocument();
+    expect(screen.queryByText("boom")).not.toBeInTheDocument();
     expect(screen.getByText("manual")).toBeInTheDocument();
   });
 
@@ -536,6 +536,18 @@ describe("WatchRuntimeInspector", () => {
     await userEvent.click(screen.getByRole("button", { name: "View error details" }));
     expect(screen.getByRole("dialog")).toHaveTextContent("TypeError: expected a number");
     expect(screen.getByRole("dialog")).toHaveTextContent("job-123");
+  });
+
+  it("does not show a run error for a successful selected block", () => {
+    render(
+      <WatchRuntimeInspector
+        selectedBlock={block({ type: "fetch_data_source" })}
+        latestBlockRun={blockRun({ blockType: "fetch_data_source", status: "success" })}
+        selectedRun={run({ status: "failed", error: "Downstream variable failed" })}
+      />,
+    );
+    expect(screen.queryByText("Downstream variable failed")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "View error details" })).not.toBeInTheDocument();
   });
 
   it("does not present a legacy previous-variable output as a custom-code job result", async () => {

@@ -497,14 +497,14 @@ describe("WorkflowWorkspace edit mode", () => {
     expect(onDeleteBlock).toHaveBeenCalledWith("b-stamp");
   });
 
-  it("shows notices for archived workflows and the last run error", () => {
+  it("shows the archived notice without a historical run error", () => {
     renderWorkspace({
       workflow: workflow({ archived: true, lastError: "boom" }),
     });
     expect(
       screen.getByText("Archived workflows do not run automatically or manually until restored."),
     ).toBeInTheDocument();
-    expect(screen.getByText("Last run failed: boom")).toBeInTheDocument();
+    expect(screen.queryByText("Last run failed: boom")).not.toBeInTheDocument();
   });
 
   it("does not render the old block/last-run/next-run status strip", () => {

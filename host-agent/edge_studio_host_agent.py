@@ -35,6 +35,9 @@ HOST_RUNTIME_FILES = {
     "script-helper/examples/animate-lux/script.json": 0o644,
     "script-helper/examples/animate-lux/main.py": 0o644,
     "script-helper/examples/animate-lux/requirements.txt": 0o644,
+    "script-helper/examples/temperature-colors/script.json": 0o644,
+    "script-helper/examples/temperature-colors/main.py": 0o644,
+    "script-helper/examples/temperature-colors/requirements.txt": 0o644,
     "docker/mosquitto/mosquitto.conf": 0o644,
 }
 

@@ -5,6 +5,8 @@ import { afterAll, beforeAll, beforeEach, describe, it, vi } from "vitest";
 import { setupTestDatabase } from "../../helpers/testDatabase.js";
 import { WORKFLOW_RUN_BUDGET_MAX_RUNS } from "../../../src/features/automation/automation.policy.js";
 
+const stopCustomCodeOwner = vi.hoisted(() => vi.fn().mockResolvedValue({ stopped: 0 }));
+
 // The router is mounted without the global auth gate, so requireRole must not 401 the request.
 vi.mock("../../../src/features/auth/auth.middleware.js", () => ({
   requireAuth: (_req: unknown, _res: unknown, next: () => void) => next(),
@@ -15,6 +17,10 @@ vi.mock("../../../src/features/data-sources/mqttIngestion.service.js", () => ({ 
 vi.mock("../../../src/features/data-sources/gpioIngestion.service.js", () => ({
   syncGpioDataSources: vi.fn(),
   getGpioInputCapability: () => ({ enabled: false, available: false, reason: null })
+}));
+vi.mock("../../../src/features/custom-code/customCode.service.js", async (importOriginal) => ({
+  ...await importOriginal<typeof import("../../../src/features/custom-code/customCode.service.js")>(),
+  stopCustomCodeOwner
 }));
 
 let teardown: () => void;
@@ -112,6 +118,37 @@ describe("POST /api/automation/workflows/:id/run — run budget", () => {
 });
 
 describe("automation workflow validation routes", () => {
+  it("rejects an invalid custom-code update without stopping its running job", async () => {
+    const workflow = workflows.createAutomationWorkflow({
+      name: "Custom code",
+      enabled: false,
+      blocks: [
+        { type: "manual_start", config: {} },
+        { type: "run_custom_code", config: { scriptId: "temperature-colors", executionMode: "background", onRunning: "update", timeoutSeconds: null, inputsJsonText: "{}" } }
+      ]
+    });
+    const codeBlock = workflows.listAutomationBlocks(workflow.id).find((block) => block.type === "run_custom_code")!;
+
+    const response = await request(app)
+      .patch(`/api/automation/workflows/${workflow.id}/blocks/${codeBlock.id}`)
+      .send({ config: { scriptId: "temperature-colors", executionMode: "invalid" } });
+
+    assert.equal(response.status, 400);
+    assert.equal(stopCustomCodeOwner.mock.calls.length, 0);
+
+    const malformed = await request(app)
+      .patch(`/api/automation/workflows/${workflow.id}/blocks/${codeBlock.id}`)
+      .send({ config: "invalid" });
+    assert.equal(malformed.status, 400);
+    assert.equal(stopCustomCodeOwner.mock.calls.length, 0);
+
+    const unchanged = await request(app)
+      .patch(`/api/automation/workflows/${workflow.id}/blocks/${codeBlock.id}`)
+      .send({});
+    assert.equal(unchanged.status, 200);
+    assert.equal(stopCustomCodeOwner.mock.calls.length, 0);
+  });
+
   it("creates an invalid requested-enabled workflow as paused", async () => {
     const response = await request(app).post("/api/automation/workflows").send({
       name: "Invalid draft workflow",

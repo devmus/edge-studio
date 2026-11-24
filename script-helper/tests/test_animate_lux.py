@@ -24,6 +24,16 @@ class AnimateLuxTests(unittest.TestCase):
         self.assertEqual(animate_lux.next_position(100, 199, 10, 20, 1), (110, 200, 10, -20))
         self.assertEqual(animate_lux.next_position(41, 41, -10, -20, 1), (40, 40, 10, 20))
 
+    def test_circle_color_uses_six_five_lux_bands(self):
+        self.assertEqual(animate_lux.circle_color(-1), "#4ea8de")
+        self.assertEqual(animate_lux.circle_color(4.99), "#4ea8de")
+        self.assertEqual(animate_lux.circle_color(5), "#48cae4")
+        self.assertEqual(animate_lux.circle_color(10), "#80ed99")
+        self.assertEqual(animate_lux.circle_color(15), "#f9e56d")
+        self.assertEqual(animate_lux.circle_color(20), "#f4a261")
+        self.assertEqual(animate_lux.circle_color(25), "#e76f51")
+        self.assertEqual(animate_lux.circle_color(30), "#e76f51")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -6,6 +6,9 @@ const ARCHIVE_SCHEMA_VERSION = 1;
 type RunRow = Record<string, unknown> & {
   id: string;
   trigger_payload_json: string | null;
+  outcome: string;
+  occurrence_count: number;
+  last_occurrence_at: string | null;
   error: string | null;
 };
 

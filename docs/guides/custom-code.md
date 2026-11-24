@@ -145,4 +145,29 @@ For a continuous animation, select Run in background, blank time limit, Update i
 
 For a finite presentation, use Wait for completion with a time limit. A one-minute BME workflow can pass temperature, humidity, pressure and other readings in one input object; the script can display each value for ten seconds and use the remaining time for general sensor information. The workflow remains active until that presentation exits successfully or fails.
 
+## Temperature color example
+
+Install the bundled `temperature-colors` example to show a BME temperature as a full-screen color with large centered text. It divides the range into ten 4°C bands from blue below 4°C through red at 36°C and above. Values outside 0–40°C use the nearest end color.
+
+```bash
+sudo cp -r /opt/edge-studio/script-helper/examples/temperature-colors /opt/edge-studio-scripts/temperature-colors
+sudo python3 -m venv /opt/edge-studio-scripts/temperature-colors/.venv
+sudo /opt/edge-studio-scripts/temperature-colors/.venv/bin/python -m pip install -r /opt/edge-studio-scripts/temperature-colors/requirements.txt
+```
+
+Build an enabled workflow with **Schedule → Fetch data source → Set variable → If field matches → Run custom code**:
+
+1. Fetch the configured BME280/BME680 source.
+2. Set variable `message` from latest data field `temperatureC`.
+3. Read workflow variable `message` with **Changed by at least** and a suitable threshold, such as `0.1`.
+4. Run `temperature-colors` in background mode with a blank time limit, **When already running** set to **Update inputs**, and Device access set to the PIM576.
+
+Use these script inputs:
+
+```json
+{"message":"{{message}}","durationSeconds":null}
+```
+
+**Keep running** deliberately ignores later inputs; the run result says `action: kept` and the screen retains the previous value. **Update inputs** sends each matching numeric temperature to the existing process. The example redraws only when that value changes, avoiding unnecessary full-screen SPI writes.
+
 Physical verification remains required: visible animation/rotation, text-busy handling, repeated updates, stop/release, runner/backend restart, pause/delete, resource use on the actual Pi and dependency/service repair. Record model/OS, expected/installed SHA, container/service health and sanitized evidence. No actual Pi deployment or display action is implied by the examples.

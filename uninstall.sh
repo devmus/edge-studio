@@ -106,7 +106,8 @@ def owned_services(app, unit_dir):
             continue
         lines = path.read_text().splitlines()
         working = next((line.partition("=")[2] for line in lines if line.startswith("WorkingDirectory=")), "")
-        if not working or Path(working).resolve() != app:
+        expected_working = app / "script-helper" if name == "edge-studio-script-helper" else app
+        if not working or Path(working).resolve() != expected_working:
             raise ValueError("Helper unit belongs to another installation: " + name)
         services.append(path)
     return services
@@ -128,11 +129,18 @@ def docker_inventory(app):
 
 def firewall_rules(services):
     rules = []
+    port_keys = {
+        "edge-studio-host-agent": "HOST_AGENT_PORT",
+        "edge-studio-camera-helper": "CAMERA_HELPER_PORT",
+        "edge-studio-sensor-helper": "SENSOR_HELPER_PORT",
+        "edge-studio-display-helper": "DISPLAY_HELPER_PORT",
+        "edge-studio-script-helper": "SCRIPT_HELPER_PORT",
+    }
     for path in services:
         text = path.read_text()
         values = dict(line.removeprefix("Environment=").split("=", 1)
                       for line in text.splitlines() if line.startswith("Environment=") and "=" in line.removeprefix("Environment="))
-        key = {"edge-studio-host-agent": "HOST_AGENT_PORT", "edge-studio-camera-helper": "CAMERA_HELPER_PORT", "edge-studio-sensor-helper": "SENSOR_HELPER_PORT"}[path.stem]
+        key = port_keys[path.stem]
         port = values.get(key, "")
         subnet = values.get("EDGE_STUDIO_DOCKER_SUBNET", "")
         if "iptables" not in text or not port.isdecimal() or not 1 <= int(port) <= 65535 or not subnet:

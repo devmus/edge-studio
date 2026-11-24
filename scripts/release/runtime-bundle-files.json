@@ -15,5 +15,8 @@
   "script-helper/examples/animate-lux/script.json",
   "script-helper/examples/animate-lux/main.py",
   "script-helper/examples/animate-lux/requirements.txt",
+  "script-helper/examples/temperature-colors/script.json",
+  "script-helper/examples/temperature-colors/main.py",
+  "script-helper/examples/temperature-colors/requirements.txt",
   "docker/mosquitto/mosquitto.conf"
 ]

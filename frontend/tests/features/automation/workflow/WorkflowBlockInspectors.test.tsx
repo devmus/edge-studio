@@ -566,9 +566,9 @@ describe("PersistedBlockInspector", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows the block's lastError", () => {
+  it("does not show the block's historical runtime error while editing", () => {
     renderPersisted({ block: persistedBlock({ lastError: "boom" }) });
-    expect(screen.getByText("boom")).toBeInTheDocument();
+    expect(screen.queryByText("boom")).not.toBeInTheDocument();
   });
 
   it("calls onDirty once config changes away from the persisted value", async () => {

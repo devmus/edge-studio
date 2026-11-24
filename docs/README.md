@@ -39,7 +39,6 @@ per-topic rules in `.agents/rules/`, `.claude/rules/`, and `.cursor/rules/`.
 
 | Plan | Status |
 | ---- | ------ |
-| [plans/developer-diagnostics-smart-workflow-history.md](./plans/developer-diagnostics-smart-workflow-history.md) | Runtime Developer diagnostics and smart workflow activity summaries in implementation/verification |
 | [plans/github-contributions.md](./plans/github-contributions.md) | Forms/guides/policies published on main; operator release and remaining public contribution acceptance gates pending, with Module Builder deferred separately |
 | [plans/page-load-performance.md](./plans/page-load-performance.md) | Measured node/telemetry separation and navigation snapshot improvements |
 | [plans/storage-history-lifecycle.md](./plans/storage-history-lifecycle.md) | Storage/history inventory and archive/import/cleanup roadmap |
