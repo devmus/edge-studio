@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import Database from "better-sqlite3";
+import { conditionBaselineKey } from "../../../src/features/automation/automationConditions.js";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, it, vi } from "vitest";
 import { setupTestDatabase } from "../../helpers/testDatabase.js";
 import { WORKFLOW_RUN_BUDGET_MAX_RUNS } from "../../../src/features/automation/automation.policy.js";
@@ -157,6 +159,104 @@ function createSource(type: string, config: unknown, name = "Source") {
   return dataSourcesRepo.createDataSource({ name, type, config });
 }
 
+describe("persisted change-threshold workflows", () => {
+  function changeWorkflow(stopLater = false) {
+    const output = createSource("http-output", { url: "https://example.com/output", method: "POST" }, "Output");
+    const workflow = makeWorkflow([
+      { type: "manual_start", config: {} },
+      { type: "set_variable", config: { variableName: "reading", variableSource: "custom_json", valueJsonText: "10" } },
+      { type: "if_payload_field_equals", config: { source: "variable", variableName: "reading", operator: "changed_by_at_least", value: 1 } },
+      ...(stopLater ? [{ type: "if_payload_field_equals", config: { source: "variable", variableName: "reading", operator: "greater_than", value: 10000 } }] : []),
+      { type: "control_output", config: { targetId: output.id, action: "send_request", bodyMode: "none" } },
+    ]);
+    const blocks = workflowRepo.listAutomationBlocks(workflow.id);
+    const variable = blocks[1];
+    const condition = blocks[2];
+    const key = conditionBaselineKey(JSON.parse(condition.config_json));
+    return { workflow, condition, key,
+      setReading: (value: unknown) => workflowRepo.updateAutomationBlock(workflow.id, variable.id, { config: { variableName: "reading", variableSource: "custom_json", valueJsonText: JSON.stringify(value) } }),
+      baseline: () => workflowRepo.getConditionBaseline(workflow.id, condition.id, key),
+    };
+  }
+
+  it("passes the first reading, accumulates small changes and handles decreases", async () => {
+    const { workflow, setReading, baseline } = changeWorkflow();
+    await service.runAutomationWorkflow(workflow.id);
+    assert.equal(baseline(), 10);
+    setReading(10.83);
+    await service.runAutomationWorkflow(workflow.id);
+    assert.equal(baseline(), 10);
+    assert.equal(sendHttpOutputMock.mock.calls.length, 1);
+    setReading(11.67);
+    await service.runAutomationWorkflow(workflow.id);
+    assert.equal(baseline(), 11.67);
+    setReading(10);
+    await service.runAutomationWorkflow(workflow.id);
+    assert.equal(baseline(), 10);
+    assert.equal(sendHttpOutputMock.mock.calls.length, 3);
+    assert.equal((db.prepare("SELECT COUNT(*) AS n FROM automation_workflow_budget_events WHERE workflow_id = ?").get(workflow.id) as { n: number }).n, 3);
+  });
+
+  it("does not advance after failed output and retries the same reading on the next run", async () => {
+    const { workflow, setReading, baseline } = changeWorkflow();
+    await service.runAutomationWorkflow(workflow.id);
+    setReading(12);
+    sendHttpOutputMock.mockRejectedValueOnce(new Error("output unavailable"));
+    await assert.rejects(service.runAutomationWorkflow(workflow.id), /output unavailable/);
+    assert.equal(baseline(), 10);
+    await service.runAutomationWorkflow(workflow.id);
+    assert.equal(baseline(), 12);
+  });
+
+  it("does not commit pending baselines when a later condition stops the workflow", async () => {
+    const { workflow, baseline } = changeWorkflow(true);
+    await service.runAutomationWorkflow(workflow.id);
+    assert.equal(baseline(), null);
+    assert.equal(sendHttpOutputMock.mock.calls.length, 0);
+  });
+
+  it("persists independently of run history and reloads the baseline from SQLite", async () => {
+    const { workflow, condition, setReading, baseline } = changeWorkflow();
+    await service.runAutomationWorkflow(workflow.id);
+    (await import("../../../src/db/database.js")).runMigrations();
+    assert.equal(baseline(), 10);
+    const secondConnection = new Database(db.name);
+    try {
+      assert.equal((secondConnection.prepare("SELECT condition_baseline_value AS value FROM automation_blocks WHERE id = ?").get(condition.id) as { value: number }).value, 10);
+      secondConnection.prepare("UPDATE automation_blocks SET condition_baseline_value = 20 WHERE id = ?").run(condition.id);
+    } finally { secondConnection.close(); }
+    setReading(10.83);
+    await service.runAutomationWorkflow(workflow.id);
+    assert.equal(baseline(), 10.83);
+    assert.equal(sendHttpOutputMock.mock.calls.length, 2);
+  });
+
+  it("preserves state on unchanged saves/disable but resets source or threshold edits and starts duplicates fresh", async () => {
+    const { workflow, condition, key, baseline } = changeWorkflow();
+    await service.runAutomationWorkflow(workflow.id);
+    const config = JSON.parse(condition.config_json);
+    workflowRepo.updateAutomationBlock(workflow.id, condition.id, { config: { value: 1, operator: "changed_by_at_least", variableName: "reading", source: "variable" } });
+    workflowRepo.updateAutomationWorkflow(workflow.id, { enabled: false });
+    assert.equal(baseline(), 10);
+    const copy = workflowRepo.duplicateAutomationWorkflow(workflow.id)!;
+    const copiedCondition = workflowRepo.listAutomationBlocks(copy.id).find((block) => block.type === "if_payload_field_equals")!;
+    assert.equal(workflowRepo.getConditionBaseline(copy.id, copiedCondition.id, key), null);
+    workflowRepo.updateAutomationBlock(workflow.id, condition.id, { config: { ...config, value: 2 } });
+    assert.equal(workflowRepo.getConditionBaseline(workflow.id, condition.id, conditionBaselineKey({ ...config, value: 2 })), null);
+  });
+
+  it("does not overwrite an edited condition with a baseline from the old in-flight run", async () => {
+    const { workflow, condition, baseline } = changeWorkflow();
+    sendHttpOutputMock.mockImplementationOnce(async () => {
+      workflowRepo.updateAutomationBlock(workflow.id, condition.id, { config: { source: "variable", variableName: "reading", operator: "changed_by_at_least", value: 2 } });
+      return { status: 200 };
+    });
+    await service.runAutomationWorkflow(workflow.id);
+    assert.equal(baseline(), null);
+    assert.equal((db.prepare("SELECT condition_baseline_value AS value FROM automation_blocks WHERE id = ?").get(condition.id) as { value: number | null }).value, null);
+  });
+
+});
 describe("BH1750 workflow reads", () => {
   it.each(["manual", "schedule"] as const)("stores lux and the reading reference for a %s run", async (trigger) => {
     const config = { sensor: "bh1750", bus: 1, address: "0x23" };
