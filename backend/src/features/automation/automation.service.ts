@@ -1,4 +1,6 @@
 import fs from "node:fs/promises";
+import { db } from "../../db/database.js";
+import { conditionBaselineKey, evaluateNumericChange, type PendingConditionBaseline } from "./automationConditions.js";
 import {
   getDataSource,
   updateDataSourceReadResult,
@@ -47,6 +49,8 @@ import {
   getAutomationWorkflow,
   listAutomationBlocks,
   listDueScheduleWorkflows,
+  getConditionBaseline,
+  saveConditionBaselines,
   updateAutomationBlockRun,
   updateAutomationWorkflow,
   updateAutomationRunError,
@@ -107,6 +111,7 @@ type WorkflowContext = {
   output?: unknown;
   stopped?: boolean;
   budgetReserved?: boolean;
+  pendingBaselines: PendingConditionBaseline[];
   variables: Record<string, unknown>;
 };
 
@@ -129,7 +134,7 @@ type WorkflowCondition = {
   source?: "trigger" | "variable";
   fieldPath?: string;
   variableName?: string;
-  operator?: FieldCondition["operator"];
+  operator?: FieldCondition["operator"] | "changed_by_at_least";
   value?: unknown;
 };
 
@@ -271,7 +276,7 @@ export async function executeWorkflow(
   markEventWorkflowAccepted(latestWorkflow.id, mainBlocks[0], trigger);
 
   runningWorkflowIds.add(latestWorkflow.id);
-  const context: WorkflowContext = { trigger, variables: {} };
+  const context: WorkflowContext = { trigger, variables: {}, pendingBaselines: [] };
   let nextRunAt: string | null = latestWorkflow.next_run_at;
   let run = null as ReturnType<typeof createAutomationRun> | null;
 
@@ -295,12 +300,16 @@ export async function executeWorkflow(
       if (context.stopped) break;
     }
 
-    const updatedWorkflow = updateAutomationRunSuccess(latestWorkflow.id, {
-      hash: context.hash ?? null,
-      proofId: context.proofId ?? null,
-      nextRunAt,
-    });
-    finishAutomationRun(run.id, { status: "success" });
+    const updatedWorkflow = db.transaction(() => {
+      if (!context.stopped) saveConditionBaselines(latestWorkflow.id, context.pendingBaselines);
+      const updated = updateAutomationRunSuccess(latestWorkflow.id, {
+        hash: context.hash ?? null,
+        proofId: context.proofId ?? null,
+        nextRunAt,
+      });
+      finishAutomationRun(run!.id, { status: "success" });
+      return updated;
+    })();
     return {
       workflow: serializeAutomationWorkflow(updatedWorkflow),
       dataSource: context.data?.sourceId
@@ -472,7 +481,7 @@ async function executeBlock(
     valueJsonText?: string;
     source?: "trigger" | "variable";
     fieldPath?: string;
-    operator?: FieldCondition["operator"];
+    operator?: WorkflowCondition["operator"];
     value?: unknown;
     condition?: FieldCondition | null;
     recipientAddressBookId?: string;
@@ -511,7 +520,7 @@ async function executeBlock(
       await fetchDataSource(workflow, block, context, String(config.sourceId ?? ""));
     else if (block.type === "capture_camera") await captureCamera(workflow, block, context, config);
     else if (block.type === "set_variable") setVariable(config, context);
-    else if (block.type === "if_payload_field_equals") checkPayloadFieldEquals(config, context);
+    else if (block.type === "if_payload_field_equals") checkPayloadFieldEquals(workflow, block, config, context);
     else if (block.type === "wait") await wait(Number(config.durationMs ?? 0));
     else if (block.type === "show_preview") showPreview(workflow, block, runId, config, context);
     else if (block.type === "stamp_integritas")
@@ -966,19 +975,23 @@ function blockLabel(type: string) {
   return "Start workflow";
 }
 
-function checkPayloadFieldEquals(config: WorkflowCondition, context: WorkflowContext) {
-  const result = evaluateWorkflowCondition(context, config);
+function checkPayloadFieldEquals(workflow: AutomationWorkflowRecord, block: AutomationBlockRecord, config: WorkflowCondition, context: WorkflowContext) {
+  const key = conditionBaselineKey(config);
+  const previous = config.operator === "changed_by_at_least" ? getConditionBaseline(workflow.id, block.id, key) : null;
+  const result = evaluateWorkflowCondition(context, config, previous);
+  if (config.operator === "changed_by_at_least" && result.matched) context.pendingBaselines.push({ blockId: block.id, configJson: block.config_json, key, value: result.actual as number });
   context.output = { ...result, action: result.matched ? "continued" : "stopped" };
   if (!result.matched) context.stopped = true;
 }
 
-function evaluateWorkflowCondition(context: WorkflowContext, condition: WorkflowCondition) {
+function evaluateWorkflowCondition(context: WorkflowContext, condition: WorkflowCondition, previous: number | null) {
   const source = condition.source ?? "trigger";
   const actual =
     source === "variable"
       ? context.variables[String(condition.variableName ?? "")]
       : getPathValue(context.trigger.payload, String(condition.fieldPath ?? ""));
-  const matched = evaluateOperator(actual, condition.operator!, condition.value);
+  const change = condition.operator === "changed_by_at_least" ? evaluateNumericChange(actual, condition.value, previous) : null;
+  const matched = condition.operator === "changed_by_at_least" ? change!.matched : evaluateOperator(actual, condition.operator!, condition.value);
   return {
     source,
     fieldPath: condition.fieldPath,
@@ -987,6 +1000,7 @@ function evaluateWorkflowCondition(context: WorkflowContext, condition: Workflow
     expected: condition.value,
     actual,
     matched,
+    ...(change ?? {}),
   };
 }
 
@@ -994,6 +1008,7 @@ function evaluateCondition(
   context: WorkflowContext,
   condition: FieldCondition & { source: "trigger" | "data" },
 ) {
+  if ((condition.operator as string) === "changed_by_at_least") throw new Error("Changed by at least requires a standalone If field matches block");
   const source =
     condition.source === "data" ? context.data?.result.preview : context.trigger.payload;
   const actual = getPathValue(source, condition.fieldPath);

@@ -107,6 +107,22 @@ function expectWarning(result: { warnings: { code: string }[] }, code: string) {
 }
 
 describe("validateAutomationDraft — workflow shape", () => {
+  it("accepts numeric change conditions and rejects invalid thresholds", async () => {
+    for (const value of [1, 0.1, 100]) {
+      const result = await validation.validateAutomationDraft([manualStart(), block({ clientId: "condition", type: "if_payload_field_equals", config: { source: "trigger", fieldPath: "lux", operator: "changed_by_at_least", value } })]);
+      assert.equal(result.ok, true);
+    }
+    for (const value of [undefined, null, 0, -1, Infinity, NaN, "1", true]) {
+      const result = await validation.validateAutomationDraft([manualStart(), block({ clientId: "condition", type: "if_payload_field_equals", config: { source: "trigger", fieldPath: "lux", operator: "changed_by_at_least", value } })]);
+      expectError(result, "condition.invalid_change_threshold");
+    }
+  });
+
+  it("rejects change conditions attached directly to stamps", async () => {
+    const result = await validation.validateAutomationDraft([manualStart(), block({ clientId: "fetch", type: "fetch_data_source" }), block({ clientId: "stamp", type: "stamp_integritas", parentBlockId: "fetch", config: { condition: { source: "data", operator: "changed_by_at_least" } } })]);
+    expectError(result, "stamp_integritas.unsupported_change_condition");
+  });
+
   it("errors when there are no blocks", async () => {
     const result = await validation.validateAutomationDraft([]);
     expectError(result, "workflow.no_blocks");

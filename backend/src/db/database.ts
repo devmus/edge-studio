@@ -101,6 +101,8 @@ export function runMigrations() {
   `);
 
   ensureColumn("automation_blocks", "parent_block_id", "TEXT");
+  ensureColumn("automation_blocks", "condition_baseline_value", "REAL");
+  ensureColumn("automation_blocks", "condition_baseline_key", "TEXT");
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS automation_runs (

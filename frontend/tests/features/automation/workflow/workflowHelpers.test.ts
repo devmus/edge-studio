@@ -159,6 +159,7 @@ describe("workflowHelpers", () => {
 
   it("conditionOperatorOptions covers all condition operators", () => {
     expect(conditionOperatorOptions.map((option) => option.value)).toEqual([
+      "changed_by_at_least",
       "equals",
       "not_equals",
       "greater_than",
