@@ -319,6 +319,11 @@ describe("automation.service — run lifecycle", () => {
     assert.equal(runs[0].status, "success");
     assert.equal(runs[0].blocks.length, 2);
     assert.ok(runs[0].blocks.every((b) => b.status === "success"));
+    assert.deepEqual(runs[0].blocks[1].config, {
+      variableName: "x",
+      variableSource: "custom_json",
+      valueJsonText: "42",
+    });
   });
 
   it("marks a failed run, persists a structured workflow error, and rethrows with details attached", async () => {
@@ -387,12 +392,46 @@ describe("automation.service — if_payload_field_equals", () => {
     await service.runAutomationWorkflow(wf.id, { type: "manual", payload: { go: true } });
     const runs = service.listSerializedAutomationRunsForWorkflow(wf.id);
     assert.equal(runs[0].blocks.length, 3);
-    const lastOutput = runs[0].blocks[2].output as { variables: Record<string, unknown> };
-    assert.equal(lastOutput.variables.reached, true);
+    assert.deepEqual(runs[0].blocks[2].output, {
+      output: { action: "set_variable", name: "reached", value: true },
+    });
   });
 });
 
 describe("automation.service — set_variable", () => {
+  it("records compact immutable configuration without repeating trigger data in every block", async () => {
+    const secret = ["private", "payload"].join("-");
+    const wf = makeWorkflow([
+      { type: "manual_start", config: {} },
+      { type: "set_variable", config: { variableName: "message", variableSource: "custom_json", valueJsonText: "30" } },
+      { type: "wait", config: { durationMs: 0 } },
+    ]);
+    await service.runAutomationWorkflow(wf.id, {
+      type: "manual",
+      payload: { marker: "unique-trigger-marker", apiKey: secret },
+    });
+    const saved = service.listSerializedAutomationRunsForWorkflow(wf.id)[0];
+    const variable = saved.blocks[1];
+    workflowRepo.updateAutomationBlock(wf.id, variable.blockId!, {
+      config: { variableName: "message", variableSource: "custom_json", valueJsonText: "99" },
+    });
+
+    const reloaded = service.listSerializedAutomationRunsForWorkflow(wf.id)[0];
+    assert.deepEqual(reloaded.blocks[1].config, {
+      variableName: "message",
+      variableSource: "custom_json",
+      valueJsonText: "30",
+    });
+    assert.deepEqual(reloaded.blocks[1].output, {
+      output: { action: "set_variable", name: "message", value: 30 },
+    });
+    assert.equal(reloaded.blocks[1].input, null);
+    assert.equal(reloaded.blocks[2].output, null);
+    assert.equal(JSON.stringify(reloaded.blocks).includes("unique-trigger-marker"), false);
+    assert.equal(JSON.stringify(reloaded).includes(secret), false);
+    assert.deepEqual(reloaded.triggerPayload, { marker: "unique-trigger-marker", apiKey: "[redacted]" });
+  });
+
   it("throws on an invalid variable name", async () => {
     const wf = makeWorkflow([
       { type: "manual_start", config: {} },
@@ -430,11 +469,15 @@ describe("automation.service — set_variable", () => {
     ]);
     await service.runAutomationWorkflow(wf.id, { type: "manual", payload: { foo: "bar" } });
     const runs = service.listSerializedAutomationRunsForWorkflow(wf.id);
-    const lastOutput = runs[0].blocks[runs[0].blocks.length - 1].output as { variables: Record<string, unknown> };
-    assert.equal(lastOutput.variables.a, 1);
-    assert.equal(lastOutput.variables.b, "bar");
-    assert.equal(lastOutput.variables.c, 5);
-    assert.equal(lastOutput.variables.d, "hash1");
+    const assignments = runs[0].blocks
+      .filter((block) => block.blockType === "set_variable")
+      .map((block) => (block.output as { output: { name: string; value: unknown } }).output);
+    assert.deepEqual(Object.fromEntries(assignments.map(({ name, value }) => [name, value])), {
+      a: 1,
+      b: "bar",
+      c: 5,
+      d: "hash1",
+    });
   });
 });
 
@@ -511,7 +554,9 @@ describe("automation.service — record_trigger_event", () => {
 
       const [run] = runsRepo.listAutomationRunsForWorkflow(wf.id, 1);
       const recordBlock = runsRepo.listAutomationBlockRuns(run.id).find((block) => block.block_type === "record_trigger_event")!;
-      assert.equal((JSON.parse(recordBlock.output_json!) as { data: { sourceUrl: string } }).data.sourceUrl, `data-source:${source.id}`);
+      const recordedData = (JSON.parse(recordBlock.output_json!) as { data: { sourceId: string; sourceUrl?: string } }).data;
+      assert.equal(recordedData.sourceId, source.id);
+      assert.equal(recordedData.sourceUrl, undefined);
       const stored = JSON.stringify([read, run, runsRepo.listAutomationBlockRuns(run.id)]);
       assert.equal(stored.includes(webhookToken) || stored.includes(brokerPassword), false, "a credential was persisted");
     }
