@@ -732,6 +732,8 @@ WorkingDirectory={APP_DIR}
 Environment=DISPLAY_HELPER_HOST={gateway}
 Environment=DISPLAY_HELPER_PORT={port}
 Environment=DISPLAY_HELPER_TOKEN={token}
+Environment=EDGE_STUDIO_DOCKER_SUBNET={config.get('EDGE_STUDIO_DOCKER_SUBNET', '172.30.0.0/24')}
+ExecStartPre=+/bin/sh -c 'if command -v iptables >/dev/null 2>&1; then iptables -C INPUT -s $EDGE_STUDIO_DOCKER_SUBNET -p tcp --dport $DISPLAY_HELPER_PORT -j ACCEPT 2>/dev/null || iptables -I INPUT -s $EDGE_STUDIO_DOCKER_SUBNET -p tcp --dport $DISPLAY_HELPER_PORT -j ACCEPT; fi'
 ExecStart={python} {APP_DIR}/display-helper/edge_studio_display_helper.py
 Restart=on-failure
 RestartSec=2

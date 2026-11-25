@@ -67,7 +67,10 @@ class HostAgentWriteTests(unittest.TestCase):
         install_calls = [call.args[0] for call in run.call_args_list if "pip" in call.args[0]]
         self.assertEqual(len(install_calls), 2)
         self.assertTrue(all("--require-hashes" in call and str(lock) in call for call in install_calls))
-        self.assertIn("Environment=DISPLAY_HELPER_HOST=172.30.0.1", self.agent.DISPLAY_SERVICE_FILE.read_text())
+        service = self.agent.DISPLAY_SERVICE_FILE.read_text()
+        self.assertIn("Environment=DISPLAY_HELPER_HOST=172.30.0.1", service)
+        self.assertIn("Environment=EDGE_STUDIO_DOCKER_SUBNET=172.30.0.0/24", service)
+        self.assertIn("iptables -C INPUT -s $EDGE_STUDIO_DOCKER_SUBNET -p tcp --dport $DISPLAY_HELPER_PORT -j ACCEPT", service)
 
     def test_display_setup_fails_without_spi_before_writing_configuration(self):
         with patch.object(self.agent.Path, "exists", return_value=False), patch.object(self.agent, "write_env") as write:

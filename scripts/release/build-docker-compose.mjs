@@ -86,9 +86,7 @@ services:
       ENABLE_CAMERA: "false"
       ENABLE_GPIO: "false"
       ENABLE_SENSORS: "false"
-      ENABLE_DISPLAYS: \${ENABLE_DISPLAYS:-false}
-      DISPLAY_HELPER_URL: \${DISPLAY_HELPER_URL:-http://172.30.0.1:38183}
-      DISPLAY_HELPER_TOKEN: \${DISPLAY_HELPER_TOKEN:-}
+      ENABLE_DISPLAYS: "false"
       HOST_AGENT_URL: \${HOST_AGENT_URL:-http://host.docker.internal:38182}
       HOST_AGENT_TOKEN: \${HOST_AGENT_TOKEN:-}
       HOST_CAPABILITY_DEBUG: \${HOST_CAPABILITY_DEBUG:-false}
