@@ -49,6 +49,8 @@ class HostAgentWriteTests(unittest.TestCase):
         code = self.root / "display-helper" / "edge_studio_display_helper.py"
         code.parent.mkdir()
         code.write_text("# helper", encoding="utf-8")
+        lock = code.parent / "requirements.lock"
+        lock.write_text("st7789==1.0.1 --hash=sha256:test\n", encoding="utf-8")
         python = self.root / ".venv-display-helper" / "bin" / "python"
         python.parent.mkdir(parents=True)
         python.write_text("# retained", encoding="utf-8")
@@ -62,7 +64,9 @@ class HostAgentWriteTests(unittest.TestCase):
         self.assertIn("DISPLAY_HELPER_TOKEN=existing-display-token", self.agent.ENV_FILE.read_text())
         self.assertIn("KEEP_ME=true", self.agent.ENV_FILE.read_text())
         self.assertFalse(any("venv" in call.args[0] for call in run.call_args_list))
-        self.assertEqual(sum("st7789==1.0.1" in call.args[0] for call in run.call_args_list), 2)
+        install_calls = [call.args[0] for call in run.call_args_list if "pip" in call.args[0]]
+        self.assertEqual(len(install_calls), 2)
+        self.assertTrue(all("--require-hashes" in call and str(lock) in call for call in install_calls))
         self.assertIn("Environment=DISPLAY_HELPER_HOST=172.30.0.1", self.agent.DISPLAY_SERVICE_FILE.read_text())
 
     def test_display_setup_fails_without_spi_before_writing_configuration(self):

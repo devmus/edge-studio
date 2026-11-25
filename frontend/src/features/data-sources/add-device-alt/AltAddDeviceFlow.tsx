@@ -305,7 +305,7 @@ function stepIntro(step: WizardStep) {
     case "actuators":
       return { title: "Actuators", description: "Control physical devices connected to this Pi." };
     default:
-      return { title: "Choose what you want to set up", description: "Start with a board, protocol integration, Pi-connected sensor, camera, or actuator." };
+      return { title: "Choose what you want to set up", description: "Start with a board, protocol integration, Pi-connected device, or this Pi's system data." };
   }
 }
 
@@ -375,6 +375,7 @@ function stepOptions(
     case "actuators":
       return [
         templateOption("GPIO LED", "Control a low-current LED output from workflow action blocks.", findOutputTemplate("GPIO LED"), selectTemplate),
+        templateOption("PIM576 SPI LCD", "Display text and workflow variables on the Pi-connected screen.", findOutputTemplate("PIM576 SPI LCD"), selectTemplate),
       ];
     default:
       return [
@@ -382,7 +383,6 @@ function stepOptions(
         { title: "Protocols", description: "Receive data or send commands using REST APIs, MQTT, or webhooks.", icon: Radio, action: () => setStep("protocols") },
         { title: "Sensors", description: "Add GPIO and environmental sensor devices attached to this Pi.", icon: ThermometerSun, action: () => setStep("sensors") },
         { title: "Actuators", description: "Control physical devices connected to this Pi.", icon: Lightbulb, action: () => setStep("actuators") },
-        templateOption("PIM576 SPI LCD", "Display text and workflow variables on the Pi-connected screen.", findOutputTemplate("PIM576 SPI LCD"), selectTemplate),
         templateOption("Raspberry Pi Camera", "Capture photos or short video clips from workflows.", findInputTemplate("Raspberry Pi Camera"), selectTemplate),
         templateOption("This Pi system data", "Record local device specifications, performance, network status, and coarse locale data.", findInputTemplate("Device System Data"), selectTemplate),
       ];

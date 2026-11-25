@@ -128,11 +128,17 @@ def docker_inventory(app):
 
 def firewall_rules(services):
     rules = []
+    port_keys = {
+        "edge-studio-host-agent": "HOST_AGENT_PORT",
+        "edge-studio-camera-helper": "CAMERA_HELPER_PORT",
+        "edge-studio-sensor-helper": "SENSOR_HELPER_PORT",
+        "edge-studio-display-helper": "DISPLAY_HELPER_PORT",
+    }
     for path in services:
         text = path.read_text()
         values = dict(line.removeprefix("Environment=").split("=", 1)
                       for line in text.splitlines() if line.startswith("Environment=") and "=" in line.removeprefix("Environment="))
-        key = {"edge-studio-host-agent": "HOST_AGENT_PORT", "edge-studio-camera-helper": "CAMERA_HELPER_PORT", "edge-studio-sensor-helper": "SENSOR_HELPER_PORT"}[path.stem]
+        key = port_keys[path.stem]
         port = values.get(key, "")
         subnet = values.get("EDGE_STUDIO_DOCKER_SUBNET", "")
         if "iptables" not in text or not port.isdecimal() or not 1 <= int(port) <= 65535 or not subnet:

@@ -29,6 +29,7 @@ HOST_RUNTIME_FILES = {
     "camera-helper/edge_studio_camera_helper.py": 0o644,
     "sensor-helper/edge_studio_sensor_helper.py": 0o644,
     "display-helper/edge_studio_display_helper.py": 0o644,
+    "display-helper/requirements.lock": 0o644,
     "docker/mosquitto/mosquitto.conf": 0o644,
 }
 
@@ -702,7 +703,8 @@ def display_status():
 def apply_displays():
     if not Path("/dev/spidev0.0").exists() or not Path("/dev/gpiochip0").exists():
         raise ValueError("Enable host SPI and ensure /dev/spidev0.0 and /dev/gpiochip0 exist, then enable SPI displays.")
-    if not (APP_DIR / "display-helper" / "edge_studio_display_helper.py").exists():
+    helper_dir = APP_DIR / "display-helper"
+    if not (helper_dir / "edge_studio_display_helper.py").exists() or not (helper_dir / "requirements.lock").exists():
         raise ValueError("Display helper code is missing. Rerun the matching source installer to refresh host files.")
     config = read_env()
     token = config.get("DISPLAY_HELPER_TOKEN") or secrets.token_hex(32)
@@ -714,7 +716,7 @@ def apply_displays():
     python = venv / "bin" / "python"
     if not python.exists():
         run(["python3", "-m", "venv", "--system-site-packages", str(venv)])
-    result = run([str(python), "-m", "pip", "install", "st7789==1.0.1", "Pillow>=10.1,<13"], check=False, timeout=300)
+    result = run([str(python), "-m", "pip", "install", "--require-hashes", "-r", str(helper_dir / "requirements.lock")], check=False, timeout=300)
     if result.returncode != 0:
         raise ValueError("Display dependency installation failed. Check package-index connectivity and Python build prerequisites, then retry Repair.")
     groups = [group for group in ("spi", "gpio") if run(["getent", "group", group], check=False).returncode == 0]

@@ -37,6 +37,22 @@ class DisplayTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "too wide"):
             helper.render_text("W" * 32, "Text")
 
+    def test_text_write_recovers_cached_controller_and_spi_state_without_reallocating_gpio(self):
+        display = helper.DisplayHelper()
+        panel = self.driver.ST7789.return_value
+        display.display = panel
+        panel._spi.mode = 3
+        panel._spi.lsbfirst = True
+        panel._spi.max_speed_hz = 1000000
+
+        display.update({"config": {"model": "pim576"}, "content": {"text": "Recovered"}})
+
+        self.assertEqual((panel._spi.mode, panel._spi.lsbfirst, panel._spi.max_speed_hz), (0, False, 16000000))
+        panel._init.assert_called_once_with()
+        panel.set_backlight.assert_called_once_with(True)
+        panel.display.assert_called_once()
+        self.driver.ST7789.assert_not_called()
+
     def test_lazy_driver_is_reused_and_shutdown_turns_backlight_off(self):
         display = helper.DisplayHelper()
         self.driver.ST7789.assert_not_called()
@@ -46,8 +62,9 @@ class DisplayTests(unittest.TestCase):
             self.assertEqual(result["rotation"], rotation)
         self.driver.ST7789.assert_called_once_with(port=0, cs=0, dc=25, backlight=24, width=240, height=240, rotation=0, spi_speed_hz=16000000, offset_left=0, offset_top=0)
         self.assertEqual(self.driver.ST7789.return_value.display.call_count, 4)
+        self.assertEqual(self.driver.ST7789.return_value._init.call_count, 3)
         display.close()
-        self.driver.ST7789.return_value.set_backlight.assert_called_once_with(False)
+        self.assertEqual([call.args[0] for call in self.driver.ST7789.return_value.set_backlight.call_args_list], [True, True, True, False])
 
     def test_invalid_requests_do_not_initialize_or_write_hardware(self):
         display = helper.DisplayHelper()
