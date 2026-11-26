@@ -527,7 +527,7 @@ function spiDisplayGuide(source: DataSource) {
       "Check Hardware support if the helper is unavailable. Repair retains its token and environment; reinstall matching source if helper code is missing.",
       "Text only, white on black, fixed font. No images, graphics, automatic refresh or additional display models. Rendering is not sent during form preview.",
       "Display text is visible to anyone near the screen and is recorded in workflow output history. Avoid secrets. Disable stops future updates; the panel may retain the last frame until power is removed.",
-      "Physical verification of PIM576 on the target Pi/OS remains pending. Record a photo and exact commit/model/OS before claiming it tested.",
+      "PIM576 output is physically verified on the documented Pi 4/Debian 13 setup. See the operator guide for the exact commit, photo and remaining evidence limits.",
     ] },
   ], "docs/guides/pim576-display.md");
 }
