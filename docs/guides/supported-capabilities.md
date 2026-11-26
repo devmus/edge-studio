@@ -61,7 +61,7 @@ Webhook, MQTT and GPIO listeners operate while enabled workflows need them. They
 | GPIO LED | Control a low-current LED through a GPIO pin | GPIO enabled, safe wiring and series resistor; **Control device**; test with **Test pulse** first | Prototype test documented; [GPIO18 LED](./gpio-device-settings.md#output-led-on-gpio18) |
 | HTTP JSON Target | Send requests/payloads to an HTTP endpoint; also supports configured multipart media uploads | Reachable allowed URL and a compatible receiving endpoint; **Control device** | Protocol integration; [test example](./tester-device-workflows.md#test-with-a-pc) |
 | MQTT Publisher | Publish JSON to a broker/topic | Reachable broker and compatible receiver; **Control device** | Protocol integration; [test example](./tester-device-workflows.md#test-with-a-pc) |
-| PIM576 SPI LCD | Display title/text on Pimoroni's 1.54-inch 240×240 SPI screen | SPI displays enabled; fixed SPI0 CE0/DC GPIO25/BL GPIO24 wiring; **Control device → Display text** with a custom variable | Physical evidence not recorded here; [setup and verification status](./pim576-display.md#verification-status) |
+| PIM576 SPI LCD | Display title/text on Pimoroni's 1.54-inch 240×240 SPI screen | SPI displays enabled; fixed SPI0 CE0/DC GPIO25/BL GPIO24 wiring; **Control device → Display text** with a custom variable | Pi 4 Model B Rev 1.4 / Debian 13 / aarch64 verified; [setup, exact commit and evidence limits](./pim576-display.md#verification-status) |
 
 Outputs do not become readable inputs. Generic GPIO access does not establish support for motors, relays or mains equipment.
 
