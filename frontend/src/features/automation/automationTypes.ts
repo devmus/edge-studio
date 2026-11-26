@@ -38,6 +38,7 @@ export type AutomationBlockType =
   | "send_transaction";
 
 export type ConditionOperator =
+  | "changed_by_at_least"
   | "equals"
   | "not_equals"
   | "greater_than"
